@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment variables & secrets (CRITICAL: keeps Supabase keys safe)
+.env
+.env.local
+.env.*.local
+
+# Production build outputs
+dist/
+build/
+
+# Local databases & logs
+server/db.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
