@@ -30,17 +30,17 @@ export default function InstructorCard({ instructor }) {
       <div className="flex items-center justify-center gap-4 text-xs font-medium mt-auto pt-3 border-t border-border w-full">
         <div className="flex items-center gap-1.5 text-foreground">
           <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-          <span className="font-semibold">{Number(instructor.rating || 4.9).toFixed(1)}</span>
+          <span className="font-semibold">{instructor.rating ? Number(instructor.rating).toFixed(1) : '5.0'}</span>
         </div>
         <div className="w-1 h-1 rounded-full bg-border" />
         <div className="flex items-center gap-1 text-muted-foreground">
           <Users className="w-3.5 h-3.5" />
-          <span>{(instructor.studentCount || 1000).toLocaleString()}</span>
+          <span>{(instructor.studentCount ?? 0).toLocaleString()} students</span>
         </div>
         <div className="w-1 h-1 rounded-full bg-border" />
         <div className="flex items-center gap-1 text-muted-foreground">
           <BookOpen className="w-3.5 h-3.5" />
-          <span>{instructor.courseCount || 3} courses</span>
+          <span>{instructor.courseCount ?? 0} courses</span>
         </div>
       </div>
     </Link>

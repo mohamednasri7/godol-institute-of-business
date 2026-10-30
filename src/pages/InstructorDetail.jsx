@@ -84,7 +84,7 @@ export default function InstructorDetail() {
                   </span>
                   <div className="flex items-center gap-2 text-2xl font-bold text-foreground">
                     <Users className="w-5 h-5 text-primary" />
-                    {(instructor.studentCount || 1000).toLocaleString()}
+                    {(instructor.studentCount ?? 0).toLocaleString()}
                   </div>
                 </div>
 
@@ -94,7 +94,7 @@ export default function InstructorDetail() {
                   </span>
                   <div className="flex items-center gap-2 text-2xl font-bold text-foreground">
                     <BookOpen className="w-5 h-5 text-primary" />
-                    {instructor.courseCount || 3}
+                    {instructor.courseCount ?? (instructor.courses?.length || 0)}
                   </div>
                 </div>
 
@@ -104,7 +104,7 @@ export default function InstructorDetail() {
                   </span>
                   <div className="flex items-center gap-2 text-2xl font-bold text-foreground">
                     <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                    {Number(instructor.rating || 4.9).toFixed(1)}
+                    {Number(instructor.rating || 5.0).toFixed(1)}
                   </div>
                 </div>
               </div>

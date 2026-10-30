@@ -1,5 +1,5 @@
-import React from 'react';
-import { Switch, Route } from 'wouter';
+import React, { useEffect } from 'react';
+import { Switch, Route, useLocation } from 'wouter';
 import Layout from './components/Layout';
 import ChatWidget from './components/ChatWidget';
 
@@ -16,6 +16,10 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Blog from './pages/Blog';
 import About from './pages/About';
+import Contact from './pages/Contact';
+import VerifyCertificate from './pages/VerifyCertificate';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
 import NotFound from './pages/NotFound';
 
 // Admin Pages
@@ -35,9 +39,18 @@ import AdminRevenue from './pages/admin/AdminRevenue';
 import AdminAuditLogs from './pages/admin/AdminAuditLogs';
 import AdminCategories from './pages/admin/AdminCategories';
 
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [location]);
+  return null;
+}
+
 export default function App() {
   return (
     <>
+      <ScrollToTop />
       <Switch>
         {/* Public Routes */}
         <Route path="/">
@@ -67,6 +80,21 @@ export default function App() {
         </Route>
         <Route path="/about">
           <Layout><About /></Layout>
+        </Route>
+        <Route path="/contact">
+          <Layout><Contact /></Layout>
+        </Route>
+        <Route path="/verify">
+          <Layout><VerifyCertificate /></Layout>
+        </Route>
+        <Route path="/verify/:code">
+          <Layout><VerifyCertificate /></Layout>
+        </Route>
+        <Route path="/privacy">
+          <Layout><Privacy /></Layout>
+        </Route>
+        <Route path="/terms">
+          <Layout><Terms /></Layout>
         </Route>
 
         {/* Auth */}

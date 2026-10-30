@@ -29,9 +29,9 @@ export default function Navbar() {
     { label: 'Home', href: '/' },
     { label: 'Courses', href: '/courses' },
     { label: 'Workshops', href: '/categories' },
-    { label: 'Instructors', href: '/instructors' },
+    { label: 'Faculty', href: '/instructors' },
     { label: 'About', href: '/about' },
-    { label: 'Blog', href: '/blog' }
+    { label: 'Contact', href: '/contact' }
   ];
 
   // Transparent only on Home before scroll

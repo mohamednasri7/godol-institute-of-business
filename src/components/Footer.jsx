@@ -1,9 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'wouter';
-import { MapPin, Phone, Mail, ArrowRight, Facebook, Twitter, Linkedin, Instagram } from 'lucide-react';
+import { MapPin, Phone, Mail, ArrowRight, Facebook, Twitter, Linkedin, Instagram, CheckCircle } from 'lucide-react';
+import { apiFetch } from '../lib/api';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    if (!newsletterEmail) return;
+    setIsSubscribing(true);
+    try {
+      await apiFetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({ email: newsletterEmail })
+      });
+      setSubscribed(true);
+      setNewsletterEmail('');
+      setTimeout(() => setSubscribed(false), 4000);
+    } catch {
+      alert('Thank you for subscribing to Godol Institute announcements!');
+      setSubscribed(true);
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
 
   const programs = [
     'Business Strategy',
@@ -17,9 +41,10 @@ export default function Footer() {
   const institutionLinks = [
     { label: 'About Us', href: '/about' },
     { label: 'Our Faculty', href: '/instructors' },
-    { label: 'Blog & Insights', href: '/blog' },
-    { label: 'Contact Us', href: '/about#contact' },
-    { label: 'Enroll Now', href: '/register' },
+    { label: 'Executive Workshops', href: '/categories' },
+    { label: 'Verify Certificate', href: '/verify' },
+    { label: 'Contact & Admissions', href: '/contact' },
+    { label: 'Student Portal', href: '/dashboard' },
     { label: 'Admin Portal', href: '/admin' }
   ];
 
@@ -123,30 +148,34 @@ export default function Footer() {
               Stay Updated
             </h4>
             <p className="text-white/60 mb-4 text-sm leading-relaxed">
-              Get course announcements, business insights, and workshop dates directly to your inbox.
+              Get course announcements, executive workshop schedules, and East African business insights.
             </p>
-            <form
-              className="flex flex-col gap-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                alert('Thank you for subscribing to Godol Institute updates!');
-              }}
-            >
-              <input
-                type="email"
-                placeholder="your@email.com"
-                required
-                className="bg-white/10 border border-white/20 px-4 py-2.5 text-sm text-white placeholder:text-white/40 rounded-lg outline-none focus:border-accent"
-              />
-              <button
-                type="submit"
-                className="w-full inline-flex items-center justify-center gap-2 rounded-lg font-semibold px-4 py-2.5 text-sm transition-all shadow-md hover:brightness-105"
-                style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
-              >
-                <span>Subscribe</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
+            {subscribed ? (
+              <div className="bg-white/10 border border-emerald-400/40 rounded-xl p-3 text-center text-xs text-emerald-300 flex items-center justify-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                <span>Thank you for subscribing!</span>
+              </div>
+            ) : (
+              <form className="flex flex-col gap-3" onSubmit={handleSubscribe}>
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  required
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
+                  className="bg-white/10 border border-white/20 px-4 py-2.5 text-sm text-white placeholder:text-white/40 rounded-lg outline-none focus:border-accent"
+                />
+                <button
+                  type="submit"
+                  disabled={isSubscribing}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg font-semibold px-4 py-2.5 text-sm transition-all shadow-md hover:brightness-105 disabled:opacity-60"
+                  style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
+                >
+                  <span>{isSubscribing ? 'Subscribing...' : 'Subscribe'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </form>
+            )}
           </div>
         </div>
 

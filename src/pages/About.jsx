@@ -101,10 +101,33 @@ const alumniReviews = [
 
 export default function About() {
   const [faculty, setFaculty] = useState([]);
+  const [contactForm, setContactForm] = useState({ name: '', email: '', subject: '', message: '' });
+  const [isSending, setIsSending] = useState(false);
+  const [sentSuccess, setSentSuccess] = useState(false);
+  const [sendError, setSendError] = useState('');
 
   useEffect(() => {
     apiFetch('/api/instructors').then(setFaculty).catch(() => {});
   }, []);
+
+  const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    setIsSending(true);
+    setSendError('');
+    try {
+      await apiFetch('/api/contact', {
+        method: 'POST',
+        body: JSON.stringify(contactForm)
+      });
+      setSentSuccess(true);
+      setContactForm({ name: '', email: '', subject: '', message: '' });
+      setTimeout(() => setSentSuccess(false), 5000);
+    } catch (err) {
+      setSendError(err.message || 'Failed to send message. Please try again or chat via WhatsApp.');
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen">
@@ -404,70 +427,85 @@ export default function About() {
               <h3 className="font-serif text-2xl font-bold mb-6 text-foreground">
                 Send Us a Message
               </h3>
-              <form
-                className="space-y-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  alert('Thank you! Your message has been sent to our admissions team.');
-                }}
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {sentSuccess ? (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-6 text-center space-y-2">
+                  <CheckCircle className="w-8 h-8 text-emerald-600 mx-auto" />
+                  <p className="font-bold text-base">Message Sent Successfully!</p>
+                  <p className="text-xs text-emerald-700">Thank you for reaching out. Our admissions team in Mogadishu will review your enquiry and respond promptly.</p>
+                </div>
+              ) : (
+                <form className="space-y-4" onSubmit={handleContactSubmit}>
+                  {sendError && (
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs">
+                      {sendError}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={contactForm.name}
+                        onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                        placeholder="Your full name"
+                        className="w-full h-11 px-4 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">
+                        Email Address *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={contactForm.email}
+                        onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                        placeholder="you@example.com"
+                        className="w-full h-11 px-4 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1.5">
-                      Full Name
+                      Subject
                     </label>
                     <input
                       type="text"
-                      required
-                      placeholder="Your name"
+                      value={contactForm.subject}
+                      onChange={(e) => setContactForm({ ...contactForm, subject: e.target.value })}
+                      placeholder="Course inquiry, cohort dates, corporate training..."
                       className="w-full h-11 px-4 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary"
                     />
                   </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-foreground mb-1.5">
-                      Email
+                      Message *
                     </label>
-                    <input
-                      type="email"
+                    <textarea
+                      rows={4}
                       required
-                      placeholder="you@example.com"
-                      className="w-full h-11 px-4 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary"
+                      value={contactForm.message}
+                      onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                      placeholder="Tell us how we can assist your educational goals..."
+                      className="w-full px-4 py-3 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary resize-none"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1.5">
-                    Subject
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Course enquiry, admissions, etc."
-                    className="w-full h-11 px-4 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1.5">
-                    Message
-                  </label>
-                  <textarea
-                    rows={4}
-                    required
-                    placeholder="Tell us how we can help..."
-                    className="w-full px-4 py-3 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary resize-none"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
-                >
-                  <span>Send Message</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={isSending}
+                    className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                  >
+                    <span>{isSending ? 'Sending Message...' : 'Send Message'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         </div>

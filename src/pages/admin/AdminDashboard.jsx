@@ -28,6 +28,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [recentPayments, setRecentPayments] = useState([]);
   const [recentEnrollments, setRecentEnrollments] = useState([]);
+  const [recentInquiries, setRecentInquiries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
 
@@ -36,14 +37,23 @@ export default function AdminDashboard() {
     Promise.all([
       apiFetch('/api/admin/stats'),
       apiFetch('/api/admin/payments?status=pending_verification'),
-      apiFetch('/api/admin/enrollments')
-    ]).then(([s, pays, enrs]) => {
+      apiFetch('/api/admin/enrollments'),
+      apiFetch('/api/admin/enquiries').catch(() => [])
+    ]).then(([s, pays, enrs, inqs]) => {
       setStats(s);
       setRecentPayments(pays.slice(0, 5));
       setRecentEnrollments(enrs.slice(0, 6));
+      setRecentInquiries((inqs || []).slice(0, 5));
       setLastRefreshed(new Date());
     }).catch(console.error)
       .finally(() => setIsLoading(false));
+  };
+
+  const handleDeleteInquiry = async (id) => {
+    if (confirm('Delete this inquiry?')) {
+      await apiFetch(`/api/admin/enquiries/${id}`, { method: 'DELETE' });
+      fetchData();
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -242,6 +252,54 @@ export default function AdminDashboard() {
             </table>
           </div>
         </div>
+        {/* Inbound Inquiries */}
+        {recentInquiries.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <div>
+                <h3 className="font-bold text-gray-900">Recent Inquiries & Contact Requests</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Prospective students and admissions leads</p>
+              </div>
+              <span className="px-2.5 py-1 bg-primary/10 text-primary font-bold text-xs rounded-full">
+                {recentInquiries.length} Lead{recentInquiries.length > 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wider font-semibold">
+                  <tr>
+                    <th className="py-3 px-6">Prospect</th>
+                    <th className="py-3 px-6">Subject</th>
+                    <th className="py-3 px-6">Message</th>
+                    <th className="py-3 px-6">Received</th>
+                    <th className="py-3 px-6 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 text-gray-700">
+                  {recentInquiries.map(inq => (
+                    <tr key={inq.id} className="hover:bg-gray-50">
+                      <td className="py-3.5 px-6 font-semibold text-gray-900">
+                        <div>{inq.name}</div>
+                        <div className="text-[11px] text-gray-400 font-normal">{inq.email} {inq.phone ? `• ${inq.phone}` : ''}</div>
+                      </td>
+                      <td className="py-3.5 px-6 text-gray-800 font-medium truncate max-w-[180px]">{inq.subject}</td>
+                      <td className="py-3.5 px-6 text-gray-600 line-clamp-1 max-w-[280px]">{inq.message}</td>
+                      <td className="py-3.5 px-6 text-gray-400">{new Date(inq.createdAt).toLocaleDateString()}</td>
+                      <td className="py-3.5 px-6 text-right">
+                        <button
+                          onClick={() => handleDeleteInquiry(inq.id)}
+                          className="px-2.5 py-1 text-red-600 hover:bg-red-50 rounded-lg font-semibold"
+                        >
+                          Dismiss
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

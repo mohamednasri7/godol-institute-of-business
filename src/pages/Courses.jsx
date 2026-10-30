@@ -255,10 +255,28 @@ export default function Courses() {
               <CourseCard key={course.id} course={course} />
             ))}
           </div>
+        ) : courses.length === 0 ? (
+          <div className="bg-card border border-border rounded-3xl p-12 text-center max-w-lg mx-auto my-12 shadow-sm">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+              <BookOpen className="w-8 h-8" />
+            </div>
+            <h3 className="font-serif text-2xl font-bold text-foreground mb-2">Academic Programs Launching Soon</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+              Our academic faculty is currently finalizing the upcoming cohort course catalog. Check back shortly or contact our admissions team on WhatsApp to register early.
+            </p>
+            <a
+              href="https://wa.me/252610000000?text=Hi%20Godol%20Institute,%20I%20would%20like%20to%20inquire%20about%20upcoming%20courses."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-full text-xs font-semibold hover:bg-primary/90 transition-all shadow-sm"
+            >
+              Inquire on Upcoming Programs
+            </a>
+          </div>
         ) : (
           <div className="bg-card border border-border rounded-2xl p-12 text-center max-w-md mx-auto my-12">
             <BookOpen className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-foreground mb-2">No courses found</h3>
+            <h3 className="text-lg font-bold text-foreground mb-2">No matching courses</h3>
             <p className="text-sm text-muted-foreground mb-6">
               No courses matched your current filter criteria. Try adjusting or clearing your filters.
             </p>

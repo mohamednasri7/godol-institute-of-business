@@ -21,6 +21,8 @@ function loadDB() {
     if (!data.students) data.students = initialData.students || [];
     if (!data.audit_logs) data.audit_logs = initialData.audit_logs || [];
     if (!data.notifications) data.notifications = initialData.notifications || [];
+    if (!data.enquiries) data.enquiries = [];
+    if (!data.newsletter_subscribers) data.newsletter_subscribers = [];
     return data;
   } catch (err) {
     return JSON.parse(JSON.stringify(initialData));
@@ -481,6 +483,72 @@ export function createApiRouter() {
       return res.json(db.certificates.filter(c => c.studentEmail?.toLowerCase() === email.toLowerCase()));
     }
     res.json(db.certificates);
+  });
+
+  // ─────────── CERTIFICATE VERIFICATION (PUBLIC) ───────────
+
+  router.get('/certificates/verify/:code', (req, res) => {
+    const db = loadDB();
+    const rawCode = (req.params.code || '').trim().toUpperCase();
+    const cert = db.certificates.find(c =>
+      (c.certificateNumber && c.certificateNumber.toUpperCase() === rawCode) ||
+      String(c.id) === rawCode
+    );
+    if (!cert) {
+      return res.status(404).json({ valid: false, error: 'Certificate record not found. Please double-check the credential ID.' });
+    }
+    res.json({
+      valid: true,
+      certificateNumber: cert.certificateNumber,
+      studentName: cert.studentName,
+      studentEmail: cert.studentEmail,
+      courseTitle: cert.courseTitle,
+      instructorName: cert.instructorName || 'Godol Institute Academic Faculty',
+      issueDate: cert.issueDate || new Date().toISOString().split('T')[0],
+      status: cert.status || 'issued',
+      institution: 'Godol Institute of Business',
+      accreditation: 'Mogadishu & East Africa Enterprise Registry'
+    });
+  });
+
+  // ─────────── CONTACT & INQUIRIES ───────────
+
+  router.post('/contact', (req, res) => {
+    const { name, email, phone, subject, message } = req.body;
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: 'Name, email, and message are required.' });
+    }
+    const db = loadDB();
+    if (!db.enquiries) db.enquiries = [];
+    const enquiry = {
+      id: nextId(db.enquiries),
+      name: String(name).trim(),
+      email: String(email).trim().toLowerCase(),
+      phone: String(phone || '').trim(),
+      subject: String(subject || 'General Inquiry').trim(),
+      message: String(message).trim(),
+      status: 'new',
+      createdAt: new Date().toISOString()
+    };
+    db.enquiries.unshift(enquiry);
+    addNotification(db, 'inquiry', 'admin@godolinstitute.so', `New admissions inquiry from ${name} (${email}): ${subject || 'General'}`);
+    addAuditLog(db, 'CONTACT_INQUIRY', email, 'inquiry', enquiry.id, `Inquiry received from ${name}: "${subject || 'General'}"`);
+    saveDB(db);
+    res.json({ success: true, message: 'Your message has been sent successfully. An admissions advisor will contact you soon.' });
+  });
+
+  router.post('/newsletter/subscribe', (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Valid email address is required.' });
+    const db = loadDB();
+    if (!db.newsletter_subscribers) db.newsletter_subscribers = [];
+    const normalized = String(email).trim().toLowerCase();
+    if (!db.newsletter_subscribers.includes(normalized)) {
+      db.newsletter_subscribers.push(normalized);
+      addAuditLog(db, 'NEWSLETTER_SUBSCRIBE', normalized, 'subscriber', db.newsletter_subscribers.length, `Subscribed to newsletter: ${normalized}`);
+      saveDB(db);
+    }
+    res.json({ success: true, message: 'Thank you for subscribing to Godol Institute announcements!' });
   });
 
   // ─────────── NOTIFICATIONS (STUDENT) ───────────
@@ -1241,6 +1309,21 @@ export function createApiRouter() {
     });
     saveDB(db);
     res.json(db.settings);
+  });
+
+  // ─────────── ADMIN INQUIRIES ───────────
+
+  router.get('/admin/enquiries', (req, res) => {
+    const db = loadDB();
+    res.json(db.enquiries || []);
+  });
+
+  router.delete('/admin/enquiries/:id', (req, res) => {
+    const db = loadDB();
+    const id = Number(req.params.id);
+    db.enquiries = (db.enquiries || []).filter(e => e.id !== id);
+    saveDB(db);
+    res.json({ success: true });
   });
 
   return router;

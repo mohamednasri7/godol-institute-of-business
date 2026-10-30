@@ -6,18 +6,20 @@ import { apiFetch } from '../../lib/api';
 const defaultCert = {
   studentName: '',
   studentEmail: '',
-  courseTitle: 'Strategic Business Planning Masterclass',
-  instructorName: 'Dr. Abdi Hassan',
+  courseTitle: '',
+  instructorName: '',
   status: 'issued'
 };
 
 export default function AdminCertificates() {
   const [certs, setCerts] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState(defaultCert);
 
   const fetchCerts = () => {
     apiFetch('/api/admin/certificates').then(setCerts).catch(console.error);
+    apiFetch('/api/admin/courses').then(setCourses).catch(console.error);
   };
 
   useEffect(() => {
@@ -131,11 +133,40 @@ export default function AdminCertificates() {
               </div>
               <div>
                 <label className="block font-semibold mb-1">Course Title</label>
+                {courses.length > 0 ? (
+                  <select
+                    value={formData.courseTitle}
+                    onChange={(e) => {
+                      const selected = courses.find(c => c.title === e.target.value);
+                      setFormData({
+                        ...formData,
+                        courseTitle: e.target.value,
+                        instructorName: selected?.instructorName || formData.instructorName
+                      });
+                    }}
+                    required
+                    className="w-full h-9 px-3 rounded-xl border border-gray-200 outline-none bg-white mb-2"
+                  >
+                    <option value="">Select a Course</option>
+                    {courses.map(c => <option key={c.id} value={c.title}>{c.title}</option>)}
+                  </select>
+                ) : null}
                 <input
                   type="text"
                   required
+                  placeholder="Or enter custom course title"
                   value={formData.courseTitle}
                   onChange={(e) => setFormData({ ...formData, courseTitle: e.target.value })}
+                  className="w-full h-9 px-3 rounded-xl border border-gray-200 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block font-semibold mb-1">Instructor / Signatory</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Lead Academic Faculty"
+                  value={formData.instructorName}
+                  onChange={(e) => setFormData({ ...formData, instructorName: e.target.value })}
                   className="w-full h-9 px-3 rounded-xl border border-gray-200 outline-none"
                 />
               </div>

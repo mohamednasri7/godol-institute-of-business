@@ -94,7 +94,7 @@ export default function Categories() {
                     {cat.name}
                   </h3>
                   <p className="text-muted-foreground text-sm font-medium">
-                    {cat.courseCount || 6} courses
+                    {cat.courseCount ?? 0} {cat.courseCount === 1 ? 'course' : 'courses'}
                   </p>
                 </Link>
               ))}
@@ -119,62 +119,80 @@ export default function Categories() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {workshops.map((w) => (
-              <div
-                key={w.id}
-                className="bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:border-primary/30 transition-all flex flex-col"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <span
-                    className="text-xs font-bold tracking-wider uppercase px-2.5 py-1 rounded-full"
-                    style={
-                      w.tag === 'Limited Seats'
-                        ? { background: 'hsl(0 84% 60% / 0.1)', color: 'hsl(0 84% 50%)' }
-                        : w.tag === 'New'
-                        ? { background: 'hsl(42 92% 52% / 0.15)', color: 'hsl(42 92% 38%)' }
-                        : { background: 'hsl(215 72% 24% / 0.1)', color: 'hsl(215 72% 30%)' }
-                    }
-                  >
-                    {w.tag || 'Upcoming'}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-medium">
-                    {w.seats || 20} seats left
-                  </span>
-                </div>
-
-                <h3 className="font-bold text-lg mb-2 text-foreground">{w.title}</h3>
-                <p className="text-xs text-muted-foreground mb-4 leading-relaxed line-clamp-2">
-                  {w.description}
-                </p>
-
-                <div className="space-y-2 mb-6 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="w-4 h-4 text-primary" />
-                    <span>{w.date}</span>
+          {workshops.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {workshops.map((w) => (
+                <div
+                  key={w.id}
+                  className="bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:border-primary/30 transition-all flex flex-col"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <span
+                      className="text-xs font-bold tracking-wider uppercase px-2.5 py-1 rounded-full"
+                      style={
+                        w.tag === 'Limited Seats'
+                          ? { background: 'hsl(0 84% 60% / 0.1)', color: 'hsl(0 84% 50%)' }
+                          : w.tag === 'New'
+                          ? { background: 'hsl(42 92% 52% / 0.15)', color: 'hsl(42 92% 38%)' }
+                          : { background: 'hsl(215 72% 24% / 0.1)', color: 'hsl(215 72% 30%)' }
+                      }
+                    >
+                      {w.tag || 'Upcoming'}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {w.seats ? `${w.seats} seats left` : 'Registration Open'}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-primary" />
-                    <span>{w.durationHours || '16 Hours'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-primary" />
-                    <span>{w.location || 'Mogadishu, Somalia'}</span>
-                  </div>
-                </div>
 
-                <div className="mt-auto pt-4 border-t border-border flex items-center justify-between">
-                  <span className="text-xl font-bold text-foreground">${w.price}</span>
-                  <Link
-                    href="/register"
-                    className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
-                  >
-                    Reserve Seat
-                  </Link>
+                  <h3 className="font-bold text-lg mb-2 text-foreground">{w.title}</h3>
+                  <p className="text-xs text-muted-foreground mb-4 leading-relaxed line-clamp-2">
+                    {w.description}
+                  </p>
+
+                  <div className="space-y-2 mb-6 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-primary" />
+                      <span>{w.date}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-primary" />
+                      <span>{w.durationHours ? `${w.durationHours} Hours` : 'Intensive'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-primary" />
+                      <span>{w.location || 'Mogadishu Campus'}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto pt-4 border-t border-border flex items-center justify-between">
+                    <span className="text-xl font-bold text-foreground">{w.price ? `$${w.price}` : 'Free'}</span>
+                    <Link
+                      href="/register"
+                      className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+                    >
+                      Reserve Seat
+                    </Link>
+                  </div>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-3xl p-10 text-center max-w-xl mx-auto shadow-sm">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+                <CalendarDays className="w-7 h-7" />
               </div>
-            ))}
-          </div>
+              <h3 className="font-serif text-xl font-bold text-foreground mb-2">Upcoming Cohorts Being Scheduled</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+                Our academic committee is currently finalizing the executive workshop calendar. Subscribe or contact our admissions office on WhatsApp to receive priority notification when seats open.
+              </p>
+              <Link
+                href="/about#contact"
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 shadow-sm"
+              >
+                Inquire on Upcoming Dates
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

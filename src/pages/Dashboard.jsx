@@ -464,7 +464,7 @@ export default function Dashboard() {
                 {activeCert.courseTitle}
               </h3>
               <p className="text-xs text-muted-foreground">
-                Instructor: {activeCert.instructorName || 'Dr. Abdi Hassan'}
+                Instructor: {activeCert.instructorName || 'Godol Institute Faculty'}
               </p>
 
               <div className="pt-6 mt-6 border-t border-border flex items-center justify-between text-xs text-muted-foreground">

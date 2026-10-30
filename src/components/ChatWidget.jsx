@@ -19,15 +19,15 @@ const quickPrompts = [
 
 const answers = {
   'Tell me about your courses':
-    'We offer 40+ business courses covering Entrepreneurship, Financial Management, Business Strategy, Digital Marketing, Leadership, and more. All designed for the East African market. Browse at /courses',
+    'We offer practical business programs covering Entrepreneurship, Financial Management, Business Strategy, Digital Marketing, Leadership, and more, all tailored to East African commercial reality. You can view all published courses at /courses.',
   'How do I enroll?':
-    'Enrolling is easy! Create a free account on our website, browse courses, and click Enroll. For in-person workshops, seats are limited — register early. Want a link to enroll?',
+    'Enrolling is simple: browse our courses catalog, select your program, and click Enroll Now. We support local mobile money (EVC Plus, Zaad, Sahal, Premier Wallet) with manual verification.',
   'When is the next workshop?':
-    'Our next live workshops in Mogadishu are:\n• Strategic Business Planning — June 14-15, 2026\n• Financial Modeling — July 5, 2026\n• Leadership Workshop — July 19-20, 2026\nWould you like to reserve a seat?',
+    'Our upcoming executive workshop dates and cohort schedules are updated regularly. You can view active workshops on our Workshops page (/categories) or speak with admissions directly.',
   'What are the fees?':
-    'Course fees vary by program. Online courses range from $49–$199. Live workshops are priced separately. We also offer scholarship programs for women in business. Shall I connect you with an advisor for a full fee schedule?',
+    'Tuition varies by program level and duration. Each course lists its transparent pricing on its overview page, including accredited certificates of completion.',
   'Talk to an advisor':
-    "I'll connect you directly with a Godol Institute advisor on WhatsApp right now. Click 'Chat on WhatsApp' below to continue your conversation with our team."
+    "We'd love to connect with you directly! Click 'Chat on WhatsApp' below to speak immediately with a Godol Institute admissions counselor."
 };
 
 const WHATSAPP_NUMBER = '252610000000';
