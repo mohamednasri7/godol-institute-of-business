@@ -61,7 +61,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-8 mb-16">
           {/* Brand info */}
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-flex mb-6">
+            <Link href="/" onClick={() => window.scrollTo(0, 0)} className="inline-flex mb-6">
               <img
                 src="/godol-logo.png"
                 alt="Godol Institute of Business"
@@ -114,6 +114,7 @@ export default function Footer() {
                 <li key={program}>
                   <Link
                     href={`/courses?category=${encodeURIComponent(program)}`}
+                    onClick={() => window.scrollTo(0, 0)}
                     className="hover:text-white transition-colors text-white/60"
                   >
                     {program}
@@ -133,6 +134,7 @@ export default function Footer() {
                 <li key={item.label}>
                   <Link
                     href={item.href}
+                    onClick={() => window.scrollTo(0, 0)}
                     className="hover:text-white transition-colors text-white/60"
                   >
                     {item.label}
@@ -189,10 +191,10 @@ export default function Footer() {
             © {currentYear} Godol Institute of Business. All rights reserved. Mogadishu, Somalia.
           </p>
           <div className="flex gap-6">
-            <Link href="/privacy" className="hover:text-white transition-colors">
+            <Link href="/privacy" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition-colors">
               Privacy Policy
             </Link>
-            <Link href="/terms" className="hover:text-white transition-colors">
+            <Link href="/terms" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition-colors">
               Terms of Service
             </Link>
           </div>

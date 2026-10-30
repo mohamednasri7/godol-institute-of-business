@@ -39,11 +39,30 @@ import AdminRevenue from './pages/admin/AdminRevenue';
 import AdminAuditLogs from './pages/admin/AdminAuditLogs';
 import AdminCategories from './pages/admin/AdminCategories';
 
+if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {
+  window.history.scrollRestoration = 'manual';
+}
+
 function ScrollToTop() {
   const [location] = useLocation();
+
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    const resetScroll = () => {
+      window.scrollTo(0, 0);
+      if (document.documentElement) document.documentElement.scrollTop = 0;
+      if (document.body) document.body.scrollTop = 0;
+    };
+
+    resetScroll();
+    const rafId = requestAnimationFrame(resetScroll);
+    const timer = setTimeout(resetScroll, 30);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timer);
+    };
   }, [location]);
+
   return null;
 }
 

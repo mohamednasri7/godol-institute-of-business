@@ -46,7 +46,7 @@ export default function Navbar() {
       }`}
     >
       <div className="container mx-auto px-4 md:px-6 flex items-center justify-between">
-        <Link href="/" className="flex items-center group">
+        <Link href="/" onClick={() => window.scrollTo(0, 0)} className="flex items-center group">
           <img
             src="/godol-logo.png"
             alt="Godol Institute of Business"
@@ -65,6 +65,10 @@ export default function Navbar() {
                 <li key={link.href}>
                   <Link
                     href={link.href}
+                    onClick={() => {
+                      window.scrollTo(0, 0);
+                      if (document.documentElement) document.documentElement.scrollTop = 0;
+                    }}
                     className={`text-sm font-medium transition-colors hover:text-primary ${
                       isActive
                         ? 'text-primary font-semibold'
@@ -145,7 +149,10 @@ export default function Navbar() {
                   ? 'text-primary bg-primary/5 font-semibold'
                   : 'text-foreground hover:bg-muted'
               }`}
-              onClick={() => setIsMobileMenuOpen(false)}
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                window.scrollTo(0, 0);
+              }}
             >
               {link.label}
             </Link>
