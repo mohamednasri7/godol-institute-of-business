@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'wouter';
+import { apiFetch } from '../lib/api';
 import {
   Sparkles,
   CheckCircle,
@@ -51,28 +52,7 @@ const timeline = [
   { year: '2026', event: 'Introducing MBA-equivalent Executive Program for senior leaders' }
 ];
 
-const leadershipTeam = [
-  {
-    name: 'Dr. Abdi Hassan',
-    role: 'Founder & Executive Director',
-    bio: 'Former Director of Finance at the Central Bank of Somalia with 20 years of experience in East African financial systems.'
-  },
-  {
-    name: 'Maryam Warsame',
-    role: 'Academic Dean',
-    bio: 'MBA from London Business School. Led academic programs at three East African universities before joining Godol.'
-  },
-  {
-    name: 'Faisal Ahmed',
-    role: 'Head of Entrepreneurship',
-    bio: 'Serial entrepreneur with 4 successful ventures across Somalia, Kenya, and Ethiopia. Angel investor and startup mentor.'
-  },
-  {
-    name: 'Hodan Nur',
-    role: 'Director of Industry Relations',
-    bio: "Connected Godol's graduates with over 100 companies across East Africa. Former HR Director at SomTel."
-  }
-];
+
 
 const alumniReviews = [
   {
@@ -120,6 +100,12 @@ const alumniReviews = [
 ];
 
 export default function About() {
+  const [faculty, setFaculty] = useState([]);
+
+  useEffect(() => {
+    apiFetch('/api/instructors').then(setFaculty).catch(() => {});
+  }, []);
+
   return (
     <div className="min-h-screen">
       {/* Hero */}
@@ -322,32 +308,39 @@ export default function About() {
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-xl mx-auto mb-14">
             <h2 className="font-serif text-4xl font-bold mb-4 text-foreground">
-              Leadership Team
+              Faculty & Leadership
             </h2>
             <p className="text-muted-foreground text-lg">
-              The experienced professionals building the future of business education in Somalia.
+              Experienced practitioners and executive educators at Godol Institute of Business.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {leadershipTeam.map(({ name, role, bio }) => (
-              <div
-                key={name}
-                className="bg-card border border-border rounded-2xl p-6 h-full hover:shadow-md hover:border-primary/20 transition-all"
-              >
-                <div className="w-14 h-14 rounded-2xl hero-gradient flex items-center justify-center mb-4 font-serif font-bold text-xl text-white">
-                  {name
-                    .split(' ')
-                    .slice(0, 2)
-                    .map((n) => n[0])
-                    .join('')}
+          {faculty.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {faculty.map((member) => (
+                <div
+                  key={member.id}
+                  className="bg-card border border-border rounded-2xl p-6 h-full hover:shadow-md hover:border-primary/20 transition-all"
+                >
+                  <img
+                    src={member.avatar || '/instructor-1.png'}
+                    alt={member.name}
+                    className="w-16 h-16 rounded-2xl object-cover mb-4 border border-border"
+                  />
+                  <h3 className="font-bold text-base mb-1 text-foreground">{member.name}</h3>
+                  <p className="text-primary text-xs font-semibold mb-2">{member.title}</p>
+                  <p className="text-muted-foreground text-xs leading-relaxed">{member.bio}</p>
                 </div>
-                <h3 className="font-bold text-base mb-1 text-foreground">{name}</h3>
-                <p className="text-primary text-xs font-semibold mb-3">{role}</p>
-                <p className="text-muted-foreground text-xs leading-relaxed">{bio}</p>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-2xl p-10 text-center max-w-lg mx-auto">
+              <h3 className="font-bold text-base text-foreground mb-2">Faculty & Leadership Profiles</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Lecturers and department heads will be officially listed here as new academic sessions launch.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

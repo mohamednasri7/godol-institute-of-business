@@ -253,30 +253,20 @@ INSERT INTO public.platform_settings (key, value, "group", label) VALUES
     ('payment_instructions_extra', 'After transferring, please submit your transaction details below. Enrollment will be activated within 24 hours of payment verification.', 'payment', 'Additional Payment Instructions')
 ON CONFLICT (key) DO NOTHING;
 
--- Categories
+-- Categories (Clean Slate: initialized with 0 courses)
 INSERT INTO public.categories (id, name, icon, color, course_count) VALUES
-    (1, 'Business Strategy', 'trending-up', '#f5a614', 12),
-    (2, 'Finance & Accounting', 'bar-chart', '#2563eb', 10),
-    (3, 'Entrepreneurship', 'pen-tool', '#10b981', 14),
-    (4, 'Digital Marketing', 'monitor-play', '#8b5cf6', 8),
-    (5, 'Leadership & HR', 'server', '#ec4899', 9),
-    (6, 'Live Workshops', 'code', '#06b6d4', 6)
-ON CONFLICT (id) DO NOTHING;
+    (1, 'Business Strategy', 'trending-up', '#f5a614', 0),
+    (2, 'Finance & Accounting', 'bar-chart', '#2563eb', 0),
+    (3, 'Entrepreneurship', 'pen-tool', '#10b981', 0),
+    (4, 'Digital Marketing', 'monitor-play', '#8b5cf6', 0),
+    (5, 'Leadership & HR', 'server', '#ec4899', 0),
+    (6, 'Live Workshops', 'code', '#06b6d4', 0)
+ON CONFLICT (id) DO UPDATE SET 
+    name = EXCLUDED.name,
+    icon = EXCLUDED.icon,
+    color = EXCLUDED.color,
+    course_count = 0;
 
--- Instructors
-INSERT INTO public.instructors (id, name, title, bio, avatar, rating, review_count, student_count, course_count, status, email, phone) VALUES
-    (1, 'Dr. Abdi Hassan', 'Founder & Former Central Bank Director', 'Former Director of Finance at the Central Bank of Somalia with over 20 years of experience shaping banking and monetary policies in East Africa.', '/instructor-1.png', 4.9, 312, 3420, 5, 'active', 'abdi.hassan@godolinstitute.so', '+252 61 100 0001'),
-    (2, 'Maryam Warsame', 'Academic Dean & Executive Coach', 'MBA from London Business School. Former management consultant with McKinsey Africa and leadership advisor to top corporate institutions.', '/instructor-2.png', 4.9, 245, 2890, 4, 'active', 'maryam.warsame@godolinstitute.so', '+252 61 100 0002'),
-    (3, 'Faisal Ahmed', 'Head of Entrepreneurship & Angel Investor', 'Serial entrepreneur who founded 4 thriving businesses across Somalia, Kenya, and Ethiopia. Active angel investor and mentor.', '/instructor-1.png', 4.8, 198, 2150, 4, 'active', 'faisal.ahmed@godolinstitute.so', '+252 61 100 0003'),
-    (4, 'Hodan Nur', 'Director of Industry Relations & HR Strategist', 'Former HR Director at SomTel. Specializes in talent acquisition, organizational culture, and connecting top business graduates with premier employers.', '/instructor-2.png', 4.9, 167, 1840, 3, 'active', 'hodan.nur@godolinstitute.so', '+252 61 100 0004')
-ON CONFLICT (id) DO NOTHING;
+-- Clean slate: No fake mock courses or instructors.
+-- All real courses, faculty, and workshops will be published directly via the Admin Dashboard.
 
--- Courses
-INSERT INTO public.courses (id, title, slug, description, price, level, duration_hours, lesson_count, enrolled_count, rating, featured, badge, thumbnail, instructor_id, instructor_name, category_id, category_name, status, approval_status) VALUES
-    (1, 'Strategic Business Planning Masterclass', 'strategic-business-planning-masterclass', 'Master strategic planning, competitive market positioning, and corporate execution frameworks tailored to the realities of the East African enterprise landscape.', 149, 'Intermediate', 24, 18, 840, 4.9, TRUE, 'Bestseller', '/course-business.png', 1, 'Dr. Abdi Hassan', 1, 'Business Strategy', 'published', 'approved'),
-    (2, 'Financial Modeling & Corporate Valuation', 'financial-modeling-corporate-valuation', 'Build robust 3-statement financial models, forecast cash flows, assess investment feasibility, and understand commercial banking credit evaluation.', 199, 'Advanced', 32, 22, 620, 4.9, TRUE, 'Accredited', '/course-design.png', 1, 'Dr. Abdi Hassan', 2, 'Finance & Accounting', 'published', 'approved'),
-    (3, 'Entrepreneurship: From Zero to Scaled Enterprise', 'entrepreneurship-zero-to-scaled-enterprise', 'A comprehensive blueprint to launch, fund, and scale a profitable business in Somalia and East Africa, from business model validation to hiring 50+ employees.', 99, 'Beginner', 20, 16, 1150, 4.8, TRUE, 'Popular', '/course-web.png', 3, 'Faisal Ahmed', 3, 'Entrepreneurship', 'published', 'approved'),
-    (4, 'Digital Marketing & Brand Building in East Africa', 'digital-marketing-brand-building', 'Harness social media, influencer partnerships, targeted meta ads, and content marketing to scale consumer brands rapidly in urban East African centers.', 89, 'Beginner', 16, 14, 940, 4.9, TRUE, 'Featured', '/course-business.png', 4, 'Hodan Nur', 4, 'Digital Marketing', 'published', 'approved'),
-    (5, 'Executive Leadership & People Management', 'executive-leadership-people-management', 'Develop the interpersonal finesse, conflict resolution skills, and visionary leadership required to guide growing corporate organizations.', 129, 'Intermediate', 22, 15, 510, 4.9, FALSE, 'Cohort 2026', '/course-design.png', 2, 'Maryam Warsame', 5, 'Leadership & HR', 'published', 'approved'),
-    (6, 'Islamic Banking & Ethical Commercial Finance', 'islamic-banking-ethical-commercial-finance', 'An authoritative guide to Shariah-compliant financial transactions, Takaful insurance, Sukuk bonds, and trade financing in modern banking.', 110, 'Intermediate', 18, 12, 780, 5.0, FALSE, 'Specialized', '/course-web.png', 1, 'Dr. Abdi Hassan', 2, 'Finance & Accounting', 'published', 'approved')
-ON CONFLICT (id) DO NOTHING;

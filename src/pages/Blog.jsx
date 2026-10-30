@@ -62,8 +62,17 @@ export default function Blog() {
       </div>
 
       <div className="container mx-auto px-4 md:px-6 py-12">
-        {/* Category Filter Pills */}
-        <div className="flex gap-2 flex-wrap mb-12">
+        {posts.length === 0 && !isLoading ? (
+          <div className="bg-card border border-border rounded-2xl p-12 text-center max-w-md mx-auto my-12">
+            <h3 className="text-lg font-bold text-foreground mb-2">No Articles Published Yet</h3>
+            <p className="text-sm text-muted-foreground">
+              Articles and industry insights will appear here once published from the admin panel.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Category Filter Pills */}
+            <div className="flex gap-2 flex-wrap mb-12">
           {categories.map((cat) => (
             <button
               key={cat}
@@ -166,7 +175,9 @@ export default function Blog() {
             </div>
           ))}
         </div>
-      </div>
+      </>
+    )}
+  </div>
 
       {/* Article Reader Modal */}
       {activePost && (

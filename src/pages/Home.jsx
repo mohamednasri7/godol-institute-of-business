@@ -102,31 +102,7 @@ export default function Home() {
     }
   ];
 
-  const defaultWorkshops = [
-    {
-      title: 'Strategic Business Planning Masterclass',
-      date: 'June 14–15, 2026',
-      location: 'Mogadishu, Somalia',
-      seats: 18,
-      tag: 'Limited Seats'
-    },
-    {
-      title: 'Financial Modeling for Entrepreneurs',
-      date: 'July 5, 2026',
-      location: 'Mogadishu, Somalia',
-      seats: 25,
-      tag: 'New'
-    },
-    {
-      title: 'Leadership & Team Management Workshop',
-      date: 'July 19–20, 2026',
-      location: 'Mogadishu, Somalia',
-      seats: 20,
-      tag: 'Popular'
-    }
-  ];
-
-  const displayWorkshops = workshops.length > 0 ? workshops : defaultWorkshops;
+  const displayWorkshops = workshops;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -275,10 +251,10 @@ export default function Home() {
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
             {[
-              { label: 'Graduates', value: '12k+', icon: GraduationCap },
-              { label: 'Business Courses', value: stats?.totalCourses || 48, icon: BookOpen },
-              { label: 'Expert Instructors', value: stats?.totalInstructors || 24, icon: Award },
-              { label: 'Average Rating', value: `${stats?.avgRating || 4.9}/5`, icon: Star }
+              { label: 'Registered Students', value: stats?.totalStudents || 0, icon: GraduationCap },
+              { label: 'Active Courses', value: stats?.totalCourses || 0, icon: BookOpen },
+              { label: 'Expert Lecturers', value: stats?.totalInstructors || 0, icon: Award },
+              { label: 'Platform Rating', value: `${stats?.avgRating || 5.0}/5`, icon: Star }
             ].map(({ label, value, icon: Icon }) => (
               <div key={label} className="text-center">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 text-primary mb-3 mx-auto">
@@ -365,51 +341,61 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {displayWorkshops.slice(0, 3).map((w, idx) => (
-              <div
-                key={w.title || idx}
-                className="bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:border-primary/30 transition-all h-full flex flex-col"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <span
-                    className="text-xs font-bold tracking-wider uppercase px-2.5 py-1 rounded-full"
-                    style={
-                      w.tag === 'Limited Seats'
-                        ? { background: 'hsl(0 84% 60% / 0.1)', color: 'hsl(0 84% 50%)' }
-                        : w.tag === 'New'
-                        ? { background: 'hsl(42 92% 52% / 0.15)', color: 'hsl(42 92% 38%)' }
-                        : { background: 'hsl(215 72% 24% / 0.1)', color: 'hsl(215 72% 30%)' }
-                    }
-                  >
-                    {w.tag || 'Upcoming'}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-medium">
-                    {w.seats || 20} seats left
-                  </span>
-                </div>
-                <h3 className="font-bold text-base mb-3 text-foreground flex-grow">
-                  {w.title}
-                </h3>
-                <div className="space-y-2 mb-6">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4 text-primary" />
-                    <span>{w.date}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="w-4 h-4 text-primary" />
-                    <span>{w.location}</span>
-                  </div>
-                </div>
-                <Link
-                  href="/register"
-                  className="w-full text-center py-2.5 rounded-full border border-primary text-primary hover:bg-primary hover:text-primary-foreground font-semibold text-sm transition-colors"
+          {displayWorkshops.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {displayWorkshops.slice(0, 3).map((w, idx) => (
+                <div
+                  key={w.title || idx}
+                  className="bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:border-primary/30 transition-all h-full flex flex-col"
                 >
-                  Reserve Your Seat
-                </Link>
-              </div>
-            ))}
-          </div>
+                  <div className="flex items-start justify-between mb-4">
+                    <span
+                      className="text-xs font-bold tracking-wider uppercase px-2.5 py-1 rounded-full"
+                      style={
+                        w.tag === 'Limited Seats'
+                          ? { background: 'hsl(0 84% 60% / 0.1)', color: 'hsl(0 84% 50%)' }
+                          : w.tag === 'New'
+                          ? { background: 'hsl(42 92% 52% / 0.15)', color: 'hsl(42 92% 38%)' }
+                          : { background: 'hsl(215 72% 24% / 0.1)', color: 'hsl(215 72% 30%)' }
+                      }
+                    >
+                      {w.tag || 'Upcoming'}
+                    </span>
+                    <span className="text-xs text-muted-foreground font-medium">
+                      {w.seats || 20} seats left
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-base mb-3 text-foreground flex-grow">
+                    {w.title}
+                  </h3>
+                  <div className="space-y-2 mb-6">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Calendar className="w-4 h-4 text-primary" />
+                      <span>{w.date}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="w-4 h-4 text-primary" />
+                      <span>{w.location}</span>
+                    </div>
+                  </div>
+                  <Link
+                    href="/register"
+                    className="w-full text-center py-2.5 rounded-full border border-primary text-primary hover:bg-primary hover:text-primary-foreground font-semibold text-sm transition-colors"
+                  >
+                    Reserve Your Seat
+                  </Link>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-2xl p-10 text-center max-w-lg mx-auto">
+              <Calendar className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+              <h3 className="font-bold text-base text-foreground mb-1">No Live Workshops Scheduled Yet</h3>
+              <p className="text-xs text-muted-foreground">
+                Upcoming executive cohorts and in-person sessions in Mogadishu will be announced here soon.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
@@ -433,17 +419,27 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredCourses.length > 0
-              ? featuredCourses.map((course) => (
-                  <CourseCard key={course.id} course={course} />
-                ))
-              : Array(4)
-                  .fill(0)
-                  .map((_, i) => (
-                    <div key={i} className="h-80 bg-muted/40 animate-pulse rounded-2xl" />
-                  ))}
-          </div>
+          {featuredCourses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {featuredCourses.map((course) => (
+                <CourseCard key={course.id} course={course} />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white border border-border rounded-2xl p-12 text-center max-w-xl mx-auto shadow-sm">
+              <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+              <h3 className="font-bold text-lg text-foreground mb-1">New Courses Coming Soon</h3>
+              <p className="text-sm text-muted-foreground mb-5">
+                Our faculty is preparing curriculum. Newly approved courses will appear here automatically.
+              </p>
+              <Link
+                href="/courses"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline bg-primary/5 px-4 py-2 rounded-xl border border-primary/20"
+              >
+                Browse Catalog <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -520,11 +516,21 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {instructors.slice(0, 4).map((inst) => (
-              <InstructorCard key={inst.id} instructor={inst} />
-            ))}
-          </div>
+          {instructors.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {instructors.slice(0, 4).map((inst) => (
+                <InstructorCard key={inst.id} instructor={inst} />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-2xl p-10 text-center max-w-lg mx-auto">
+              <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+              <h3 className="font-bold text-base text-foreground mb-1">Faculty Profiles Coming Soon</h3>
+              <p className="text-xs text-muted-foreground">
+                Our faculty and lecturer profiles will be introduced alongside upcoming academic programs.
+              </p>
+            </div>
+          )}
         </div>
       </section>
 

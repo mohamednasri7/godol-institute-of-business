@@ -31,17 +31,28 @@ export default function Instructors() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {isLoading
-            ? Array(4)
-                .fill(0)
-                .map((_, i) => (
-                  <div key={i} className="h-64 bg-muted/40 animate-pulse rounded-2xl" />
-                ))
-            : instructors.map((instructor) => (
-                <InstructorCard key={instructor.id} instructor={instructor} />
+        {isLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {Array(4)
+              .fill(0)
+              .map((_, i) => (
+                <div key={i} className="h-64 bg-muted/40 animate-pulse rounded-2xl" />
               ))}
-        </div>
+          </div>
+        ) : instructors.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {instructors.map((instructor) => (
+              <InstructorCard key={instructor.id} instructor={instructor} />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-2xl p-12 text-center max-w-md mx-auto my-12">
+            <h3 className="text-lg font-bold text-foreground mb-2">Faculty Profiles Coming Soon</h3>
+            <p className="text-sm text-muted-foreground">
+              Distinguished instructors and guest executives will be listed here as courses are uploaded.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
