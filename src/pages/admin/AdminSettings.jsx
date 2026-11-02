@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Phone, Globe, CreditCard, Info, Database, CheckCircle, AlertCircle } from 'lucide-react';
+import { Save, Phone, Globe, CreditCard, Info, Database, CheckCircle, AlertCircle, RefreshCw, DownloadCloud, UploadCloud, Layout, BookOpen, Upload } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
 
 const GROUPS = [
+  { key: 'homepage', label: 'Homepage Hero & Announcement', icon: Layout },
+  { key: 'about', label: 'About Us Page & Mission Message', icon: BookOpen },
   { key: 'general', label: 'General Settings', icon: Globe },
   { key: 'contact', label: 'Contact & WhatsApp', icon: Phone },
   { key: 'payment', label: 'Mobile Money Payment Providers', icon: CreditCard },
@@ -18,10 +20,11 @@ export default function AdminSettings() {
   const [savedGroup, setSavedGroup] = useState(null);
   const [toast, setToast] = useState(null);
   const [dbStatus, setDbStatus] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
+  const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
-  useEffect(() => {
+  const loadData = () => {
     apiFetch('/api/admin/settings').then(data => {
       setSettings(data);
       const v = {};
@@ -30,7 +33,37 @@ export default function AdminSettings() {
     }).catch(console.error);
 
     apiFetch('/api/database/status').then(setDbStatus).catch(() => {});
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
+
+  const handlePull = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await apiFetch('/api/database/pull', { method: 'POST' });
+      showToast(res.message || 'Pulled fresh data from Supabase!');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Pull failed', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handlePush = async () => {
+    setIsSyncing(true);
+    try {
+      await apiFetch('/api/database/sync', { method: 'POST' });
+      showToast('All local tables pushed to Supabase successfully!');
+      loadData();
+    } catch (err) {
+      showToast(err.message || 'Push failed', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleSave = async (group) => {
     setIsSaving(true);
@@ -57,30 +90,81 @@ export default function AdminSettings() {
       <div className="space-y-6">
         {/* Database & Supabase Status */}
         <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                <Database className="w-4 h-4" />
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Database className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-gray-900 text-sm">Database & Supabase Engine</h3>
-                <p className="text-xs text-gray-500">PostgreSQL schema, migrations, and storage</p>
+                <h3 className="font-bold text-gray-900 text-sm">Database & Supabase Live Engine</h3>
+                <p className="text-xs text-gray-500">PostgreSQL cloud storage with live two-way dashboard synchronization</p>
               </div>
             </div>
-            {dbStatus?.configured ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Supabase Connected
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200">
-                <Info className="w-3.5 h-3.5 text-blue-600" /> Active: Local JSON DB (Ready for Supabase)
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {dbStatus?.configured ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Supabase Connected
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                  <Info className="w-3.5 h-3.5 text-blue-600" /> Active: Local JSON DB (Ready for Supabase)
+                </span>
+              )}
+            </div>
           </div>
-          <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-600 space-y-2">
-            <p><strong>Engine:</strong> {dbStatus?.engine || 'Checking...'}</p>
-            <p className="text-gray-500">
-              To connect your live Supabase project: paste your <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> into the project's <code>.env</code> file, and run the SQL migration in <code>supabase/schema.sql</code> inside the Supabase SQL Editor.
+
+          {/* Counts overview */}
+          {dbStatus?.counts && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-4 p-3 bg-gray-50 rounded-xl text-center">
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Instructors</p>
+                <p className="text-sm font-bold text-gray-800">{dbStatus.counts.instructors}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Courses</p>
+                <p className="text-sm font-bold text-gray-800">{dbStatus.counts.courses}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Categories</p>
+                <p className="text-sm font-bold text-gray-800">{dbStatus.counts.categories}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Workshops</p>
+                <p className="text-sm font-bold text-gray-800">{dbStatus.counts.workshops}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Students</p>
+                <p className="text-sm font-bold text-gray-800">{dbStatus.counts.students}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Settings</p>
+                <p className="text-sm font-bold text-gray-800">{dbStatus.counts.settings}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+            <button
+              onClick={handlePull}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-800 transition-all disabled:opacity-50"
+            >
+              <DownloadCloud className={`w-3.5 h-3.5 ${isSyncing ? 'animate-bounce' : ''}`} />
+              <span>Pull Changes from Supabase</span>
+            </button>
+
+            <button
+              onClick={handlePush}
+              disabled={isSyncing}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-primary hover:bg-primary/90 text-white transition-all disabled:opacity-50"
+            >
+              <UploadCloud className={`w-3.5 h-3.5 ${isSyncing ? 'animate-bounce' : ''}`} />
+              <span>Push All Local to Supabase</span>
+            </button>
+
+            <p className="text-[11px] text-gray-500 ml-auto">
+              {isSyncing ? 'Synchronizing with Supabase...' : 'Any change you make in this dashboard automatically saves to Supabase.'}
             </p>
           </div>
         </div>
@@ -114,29 +198,69 @@ export default function AdminSettings() {
                 </button>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
-                {groupSettings.map(setting => (
-                  <div key={setting.key}>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">{setting.label}</label>
-                    {setting.key.includes('instructions') || setting.key.includes('bio') || setting.key.includes('description') ? (
-                      <textarea
-                        value={values[setting.key] || ''}
-                        onChange={e => setValues(prev => ({ ...prev, [setting.key]: e.target.value }))}
-                        rows={3}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-primary resize-none"
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={values[setting.key] || ''}
-                        onChange={e => setValues(prev => ({ ...prev, [setting.key]: e.target.value }))}
-                        className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm outline-none focus:border-primary"
-                      />
-                    )}
-                    {setting.key.includes('phone') || setting.key.includes('merchant') ? (
-                      <p className="text-[10px] text-gray-400 mt-1">Enter in international format (no + or spaces), e.g. 252610000000</p>
-                    ) : null}
-                  </div>
-                ))}
+                {groupSettings.map(setting => {
+                  const isLongText = setting.key.includes('instructions') || setting.key.includes('bio') || setting.key.includes('description') || setting.key.includes('text') || setting.key.includes('message') || setting.key.includes('subtitle');
+                  const isImage = setting.key.includes('image') || setting.key.includes('avatar') || setting.key.includes('photo');
+
+                  return (
+                    <div key={setting.key} className={isLongText ? 'md:col-span-2' : ''}>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1.5">{setting.label}</label>
+
+                      {isImage ? (
+                        <div className="flex items-center gap-3.5 p-3 bg-gray-50 border border-gray-200 rounded-2xl">
+                          <img
+                            src={values[setting.key] || '/instructor-1.png'}
+                            alt="Preview"
+                            className="w-16 h-16 rounded-xl object-cover border border-gray-200 flex-shrink-0"
+                          />
+                          <div className="flex-1 space-y-2">
+                            <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/90 transition-all shadow-sm">
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Upload Photo</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const reader = new FileReader();
+                                  reader.onload = () => setValues(prev => ({ ...prev, [setting.key]: reader.result }));
+                                  reader.readAsDataURL(file);
+                                }}
+                              />
+                            </label>
+                            <input
+                              type="text"
+                              value={values[setting.key] || ''}
+                              onChange={e => setValues(prev => ({ ...prev, [setting.key]: e.target.value }))}
+                              placeholder="/instructor-1.png or https://..."
+                              className="w-full h-8 px-2.5 text-xs bg-white rounded-lg border border-gray-200 outline-none focus:border-primary"
+                            />
+                          </div>
+                        </div>
+                      ) : isLongText ? (
+                        <textarea
+                          value={values[setting.key] || ''}
+                          onChange={e => setValues(prev => ({ ...prev, [setting.key]: e.target.value }))}
+                          rows={3}
+                          className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-primary resize-none leading-relaxed"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={values[setting.key] || ''}
+                          onChange={e => setValues(prev => ({ ...prev, [setting.key]: e.target.value }))}
+                          className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm outline-none focus:border-primary"
+                        />
+                      )}
+
+                      {setting.key.includes('phone') || setting.key.includes('merchant') ? (
+                        <p className="text-[10px] text-gray-400 mt-1">Enter in international format (no + or spaces), e.g. 252610000000</p>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

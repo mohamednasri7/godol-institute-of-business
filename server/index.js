@@ -29,16 +29,183 @@ function loadDB() {
   }
 }
 
+// Whitelist of valid PostgreSQL columns per table to avoid PostgREST schema cache errors
+const TABLE_COLUMNS = {
+  instructors: ['id', 'name', 'title', 'bio', 'avatar', 'email', 'phone', 'rating', 'review_count', 'student_count', 'course_count', 'status', 'joined_at'],
+  courses: ['id', 'title', 'slug', 'description', 'price', 'level', 'duration_hours', 'lesson_count', 'enrolled_count', 'rating', 'featured', 'badge', 'thumbnail', 'instructor_id', 'instructor_name', 'category_id', 'category_name', 'status', 'approval_status', 'what_you_learn', 'requirements', 'sections', 'created_at'],
+  categories: ['id', 'name', 'icon', 'color', 'course_count'],
+  enrollments: ['id', 'student_name', 'student_email', 'student_phone', 'course_id', 'course_title', 'course_price', 'payment_id', 'payment_status', 'enrollment_status', 'access_granted', 'access_granted_at', 'progress', 'enrolled_at', 'approved_at', 'approved_by', 'rejection_reason'],
+  payments: ['id', 'enrollment_id', 'course_id', 'course_title', 'course_price', 'student_name', 'student_email', 'student_phone', 'student_whatsapp', 'provider', 'sender_phone', 'transaction_ref', 'claimed_amount', 'verified_amount', 'currency', 'status', 'payment_date', 'submitted_at', 'verified_at', 'verified_by', 'rejected_at', 'rejected_by', 'rejection_reason', 'admin_notes', 'receipt_url'],
+  certificates: ['id', 'student_name', 'student_email', 'course_id', 'course_title', 'instructor_name', 'certificate_number', 'status', 'issue_date'],
+  workshops: ['id', 'title', 'slug', 'description', 'location', 'date', 'duration_hours', 'capacity', 'enrolled_count', 'price', 'status', 'featured', 'tag', 'seats'],
+  blog_posts: ['id', 'title', 'slug', 'excerpt', 'content', 'category', 'author', 'read_time', 'published', 'featured', 'published_at'],
+  platform_settings: ['key', 'value', 'group', 'label'],
+  profiles: ['id', 'email', 'name', 'phone', 'whatsapp', 'role', 'status', 'admin_notes', 'created_at'],
+  audit_logs: ['id', 'action', 'admin_email', 'target_type', 'target_id', 'details', 'timestamp'],
+  notifications: ['id', 'type', 'student_email', 'message', 'read', 'created_at']
+};
+
+function toSnakeCase(str) {
+  return str.replace(/([A-Z])/g, '_$1').toLowerCase();
+}
+
+function snakeToCamel(str) {
+  return str.replace(/_([a-z0-9])/g, (_, letter) => letter.toUpperCase());
+}
+
+function rowToSnake(obj, tableName) {
+  const allowed = tableName && TABLE_COLUMNS[tableName];
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const snakeKey = toSnakeCase(k);
+    if (!allowed || allowed.includes(snakeKey)) {
+      out[snakeKey] = v;
+    }
+  }
+  return out;
+}
+
+function rowToCamel(obj) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    out[snakeToCamel(k)] = v;
+  }
+  return out;
+}
+
+// Map local JSON keys <-> Supabase table names
+const LOCAL_TO_SUPABASE = {
+  instructors: 'instructors',
+  courses: 'courses',
+  categories: 'categories',
+  enrollments: 'enrollments',
+  payments: 'payments',
+  certificates: 'certificates',
+  workshops: 'workshops',
+  blog: 'blog_posts',
+  students: 'profiles',
+  audit_logs: 'audit_logs',
+  notifications: 'notifications'
+};
+
+// Generic sync of any table to Supabase
+async function syncTable(tableName, rows) {
+  if (!isSupabaseConfigured || !supabase) return;
+  if (!Array.isArray(rows) || rows.length === 0) return;
+  try {
+    const snakeRows = rows.map(r => rowToSnake(r, tableName));
+    const conflictKey = tableName === 'platform_settings' ? 'key' : 'id';
+    const { error } = await supabase.from(tableName).upsert(snakeRows, { onConflict: conflictKey });
+    if (error) {
+      console.error(`Supabase sync error for ${tableName}:`, error.message);
+    }
+  } catch (err) {
+    console.error(`Supabase sync error for ${tableName}:`, err.message);
+  }
+}
+
+// Delete item from Supabase
+async function deleteFromSupabase(tableName, id) {
+  if (!isSupabaseConfigured || !supabase) return;
+  try {
+    const { error } = await supabase.from(tableName).delete().eq('id', id);
+    if (error) console.error(`Supabase delete error for ${tableName} id=${id}:`, error.message);
+  } catch (err) {
+    console.error(`Supabase delete error for ${tableName} id=${id}:`, err.message);
+  }
+}
+
+let lastSyncTime = 0;
+let isSyncingNow = false;
+
+// Pull latest data from Supabase into local DB
+export async function pullFromSupabase() {
+  if (!isSupabaseConfigured || !supabase) return false;
+  try {
+    const db = loadDB();
+    let updated = false;
+
+    for (const [localKey, supabaseTable] of Object.entries(LOCAL_TO_SUPABASE)) {
+      const { data, error } = await supabase.from(supabaseTable).select('*');
+      if (!error && Array.isArray(data)) {
+        db[localKey] = data.map(rowToCamel);
+        updated = true;
+      }
+    }
+
+    // Pull settings
+    const { data: settingsData, error: sErr } = await supabase.from('platform_settings').select('*');
+    if (!sErr && Array.isArray(settingsData) && settingsData.length > 0) {
+      db.settings = settingsData.map(rowToCamel);
+      updated = true;
+    }
+
+    if (updated) {
+      db.stats = {
+        totalStudents: db.students?.length || 0,
+        totalCourses: db.courses?.length || 0,
+        totalInstructors: db.instructors?.length || 0,
+        avgRating: 5.0
+      };
+      fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf8');
+      lastSyncTime = Date.now();
+    }
+    return true;
+  } catch (err) {
+    console.error('Error in pullFromSupabase:', err.message);
+    return false;
+  }
+}
+
+// Ensure data is fresh from Supabase before reading
+export async function ensureFreshData(force = false) {
+  if (!isSupabaseConfigured || !supabase) return loadDB();
+  const now = Date.now();
+  if (force || (now - lastSyncTime > 2500 && !isSyncingNow)) {
+    isSyncingNow = true;
+    try {
+      await pullFromSupabase();
+    } catch (err) {
+      console.warn('Sync error:', err.message);
+    } finally {
+      isSyncingNow = false;
+    }
+  }
+  return loadDB();
+}
+
+// Background sync every 5 seconds so any changes made on Supabase
+// are pulled automatically into the dashboard and website without needing a reload
+if (isSupabaseConfigured) {
+  const syncInterval = setInterval(() => {
+    ensureFreshData().catch(() => {});
+  }, 5000);
+  if (syncInterval.unref) syncInterval.unref();
+}
+
 function saveDB(data) {
+  lastSyncTime = Date.now();
   fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
 
-  // If Supabase is configured, sync in background
+  // If Supabase is configured, sync every table in background
   if (isSupabaseConfigured && supabase) {
     (async () => {
       try {
-        // Upsert platform settings
+        // Upsert platform settings (uses 'key' conflict)
         if (data.settings && data.settings.length > 0) {
-          await supabase.from('platform_settings').upsert(data.settings, { onConflict: 'key' });
+          const snakeSettings = data.settings.map((s, i) => {
+            const row = rowToSnake(s, 'platform_settings');
+            if (!row.id) row.id = s.id || (i + 1);
+            return row;
+          });
+          const { error } = await supabase.from('platform_settings').upsert(snakeSettings, { onConflict: 'key' });
+          if (error) console.error('Platform settings sync error:', error.message);
+        }
+        // Sync all other tables using the mapping
+        for (const [localKey, supabaseTable] of Object.entries(LOCAL_TO_SUPABASE)) {
+          if (data[localKey] && Array.isArray(data[localKey]) && data[localKey].length > 0) {
+            await syncTable(supabaseTable, data[localKey]);
+          }
         }
       } catch (err) {
         console.error('Background Supabase sync error:', err.message);
@@ -89,16 +256,90 @@ export function createApiRouter() {
   const router = express.Router();
   router.use(express.json({ limit: '25mb' }));
 
-  // ─────────── DATABASE STATUS ───────────
+  // Auto-sync middleware: for any GET request, if it's been > 2.5s since last sync,
+  // pull latest changes from Supabase so the dashboard and website always show the newest data
+  router.use(async (req, res, next) => {
+    if (isSupabaseConfigured && req.method === 'GET') {
+      const now = Date.now();
+      if (now - lastSyncTime > 2500 && !isSyncingNow) {
+        await ensureFreshData();
+      }
+    }
+    next();
+  });
+
+  // ─────────── DATABASE STATUS & TWO-WAY SYNC ───────────
   router.get('/database/status', (req, res) => {
+    const db = loadDB();
     res.json({
       configured: isSupabaseConfigured,
-      engine: isSupabaseConfigured ? 'Supabase (PostgreSQL)' : 'Local JSON DB (Fallback)',
+      engine: isSupabaseConfigured ? 'Supabase (PostgreSQL Connected)' : 'Local JSON DB (Fallback)',
+      counts: {
+        instructors: db.instructors?.length || 0,
+        courses: db.courses?.length || 0,
+        categories: db.categories?.length || 0,
+        workshops: db.workshops?.length || 0,
+        students: db.students?.length || 0,
+        enrollments: db.enrollments?.length || 0,
+        payments: db.payments?.length || 0,
+        certificates: db.certificates?.length || 0,
+        settings: db.settings?.length || 0
+      },
       tables: ['profiles', 'courses', 'categories', 'instructors', 'enrollments', 'payments', 'certificates', 'workshops', 'blog_posts', 'platform_settings', 'audit_logs']
     });
   });
 
+  // Pull latest data from Supabase into dashboard
+  router.post('/database/pull', async (req, res) => {
+    if (!isSupabaseConfigured || !supabase) {
+      return res.status(400).json({ error: 'Supabase is not configured' });
+    }
+    const ok = await pullFromSupabase();
+    const db = loadDB();
+    res.json({ success: ok, message: ok ? 'Pulled latest data from Supabase successfully' : 'Failed to pull from Supabase', stats: db.stats });
+  });
+
+  // Push all local DB tables to Supabase
+  router.post('/database/sync', async (req, res) => {
+    if (!isSupabaseConfigured || !supabase) {
+      return res.status(400).json({ error: 'Supabase is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to .env' });
+    }
+    const db = loadDB();
+    const results = {};
+
+    // Sync settings
+    if (db.settings && db.settings.length > 0) {
+      const snakeSettings = db.settings.map(s => rowToSnake(s, 'platform_settings'));
+      const { error } = await supabase.from('platform_settings').upsert(snakeSettings, { onConflict: 'key' });
+      results.platform_settings = error ? error.message : `${db.settings.length} rows synced`;
+    }
+
+    // Sync all mapped tables with sanitization
+    for (const [localKey, supabaseTable] of Object.entries(LOCAL_TO_SUPABASE)) {
+      const rows = db[localKey];
+      if (rows && Array.isArray(rows) && rows.length > 0) {
+        const snakeRows = rows.map(r => rowToSnake(r, supabaseTable));
+        const { error } = await supabase.from(supabaseTable).upsert(snakeRows, { onConflict: 'id' });
+        results[supabaseTable] = error ? error.message : `${rows.length} rows synced`;
+      } else {
+        results[supabaseTable] = '0 rows (empty)';
+      }
+    }
+
+    res.json({ success: true, results });
+  });
+
   // ─────────── PUBLIC ROUTES ───────────
+
+  // Public Platform & Content Settings (Hero, About, Mission, Contact, Branding)
+  router.get('/settings', (req, res) => {
+    const db = loadDB();
+    const map = {};
+    (db.settings || []).forEach(s => {
+      map[s.key] = s.value;
+    });
+    res.json({ list: db.settings || [], map });
+  });
 
   // Courses
   router.get('/courses', (req, res) => {
@@ -709,6 +950,7 @@ export function createApiRouter() {
     db.courses = db.courses.filter(c => c.id !== id);
     db.stats.totalCourses = db.courses.length;
     saveDB(db);
+    deleteFromSupabase('courses', id);
     res.json({ success: true });
   });
 
@@ -929,6 +1171,7 @@ export function createApiRouter() {
     const id = Number(req.params.id);
     db.enrollments = db.enrollments.filter(e => e.id !== id);
     saveDB(db);
+    deleteFromSupabase('enrollments', id);
     res.json({ success: true });
   });
 
@@ -1158,6 +1401,7 @@ export function createApiRouter() {
     db.instructors = db.instructors.filter(i => i.id !== id);
     db.stats.totalInstructors = db.instructors.length;
     saveDB(db);
+    deleteFromSupabase('instructors', id);
     res.json({ success: true });
   });
 
@@ -1191,6 +1435,7 @@ export function createApiRouter() {
     const id = Number(req.params.id);
     db.workshops = db.workshops.filter(w => w.id !== id);
     saveDB(db);
+    deleteFromSupabase('workshops', id);
     res.json({ success: true });
   });
 
@@ -1224,6 +1469,7 @@ export function createApiRouter() {
     const id = Number(req.params.id);
     db.blog = db.blog.filter(p => p.id !== id);
     saveDB(db);
+    deleteFromSupabase('blog_posts', id);
     res.json({ success: true });
   });
 
@@ -1253,6 +1499,7 @@ export function createApiRouter() {
     const id = Number(req.params.id);
     db.certificates = db.certificates.filter(c => c.id !== id);
     saveDB(db);
+    deleteFromSupabase('certificates', id);
     res.json({ success: true });
   });
 
@@ -1286,6 +1533,7 @@ export function createApiRouter() {
     const id = Number(req.params.id);
     db.categories = db.categories.filter(c => c.id !== id);
     saveDB(db);
+    deleteFromSupabase('categories', id);
     res.json({ success: true });
   });
 

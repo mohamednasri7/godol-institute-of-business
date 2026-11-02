@@ -51,7 +51,7 @@ export default function Contact() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background px-4 md:px-6">
       {/* Hero Header */}
       <section className="bg-[hsl(215,72%,18%)] pt-36 pb-20 text-white relative overflow-hidden text-center">
         <div className="container mx-auto px-4 md:px-6 relative z-10">
@@ -71,7 +71,7 @@ export default function Contact() {
       {/* Main Content */}
       <section className="py-20">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12 items-start">
             {/* Contact Details & WhatsApp */}
             <div className="space-y-6">
               <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">

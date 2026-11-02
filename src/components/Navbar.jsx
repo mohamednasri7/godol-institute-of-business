@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Menu, X } from 'lucide-react';
 import { auth } from '../lib/auth';
+import { SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
+
+const hasClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -29,7 +32,7 @@ export default function Navbar() {
     { label: 'Home', href: '/' },
     { label: 'Courses', href: '/courses' },
     { label: 'Workshops', href: '/categories' },
-    { label: 'Faculty', href: '/instructors' },
+    { label: 'Instructors', href: '/instructors' },
     { label: 'About', href: '/about' },
     { label: 'Contact', href: '/contact' }
   ];
@@ -95,7 +98,38 @@ export default function Navbar() {
                 Admin Panel
               </Link>
             )}
-            {currentUser ? (
+
+            {hasClerk ? (
+              <>
+                <SignedIn>
+                  <Link
+                    href="/dashboard"
+                    className="inline-flex items-center justify-center rounded-full px-4 py-2 text-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-all shadow-sm"
+                  >
+                    My Dashboard
+                  </Link>
+                  <UserButton afterSignOutUrl="/" />
+                </SignedIn>
+                <SignedOut>
+                  <Link
+                    href="/login"
+                    className={`px-4 py-2 text-sm font-medium transition-colors rounded-lg ${
+                      isTransparent
+                        ? 'text-white/90 hover:text-white hover:bg-white/10'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-sm"
+                  >
+                    Enroll Now
+                  </Link>
+                </SignedOut>
+              </>
+            ) : currentUser ? (
               <Link
                 href="/dashboard"
                 className="inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-all shadow-sm"
@@ -160,7 +194,41 @@ export default function Navbar() {
 
           <div className="h-px w-full bg-border my-2" />
 
-          {currentUser ? (
+          {hasClerk ? (
+            <>
+              <SignedIn>
+                <div className="flex items-center justify-between py-2 px-1">
+                  <span className="text-sm font-medium text-foreground">Signed in</span>
+                  <UserButton afterSignOutUrl="/" />
+                </div>
+                <Link
+                  href="/dashboard"
+                  className="w-full text-center py-2.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  My Dashboard
+                </Link>
+              </SignedIn>
+              <SignedOut>
+                <div className="flex flex-col gap-2.5">
+                  <Link
+                    href="/login"
+                    className="w-full text-center py-2.5 rounded-full border border-border text-foreground font-semibold text-sm hover:bg-muted"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Log in
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="w-full text-center py-2.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Enroll Now
+                  </Link>
+                </div>
+              </SignedOut>
+            </>
+          ) : currentUser ? (
             <Link
               href="/dashboard"
               className="w-full text-center py-2.5 rounded-full bg-primary text-primary-foreground font-semibold text-sm"

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Eye, EyeOff, BookOpen, CheckCircle, Users, ArrowRight } from 'lucide-react';
 import { auth } from '../lib/auth';
+import { SignIn } from '@clerk/clerk-react';
+
+const hasClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -13,6 +16,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showDirectLogin, setShowDirectLogin] = useState(!hasClerk);
 
   const handleLoginSubmit = (e) => {
     e.preventDefault();
@@ -129,68 +133,93 @@ export default function Login() {
             </p>
           </div>
 
-          {errorMessage && (
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700">
-              {errorMessage}
+          {hasClerk && !showDirectLogin ? (
+            <div className="flex flex-col items-center">
+              <SignIn routing="hash" />
+              <button
+                type="button"
+                onClick={() => setShowDirectLogin(true)}
+                className="mt-6 text-xs text-muted-foreground hover:text-primary transition-colors underline"
+              >
+                Sign in with Admin / Direct Student Portal
+              </button>
             </div>
-          )}
-
-          <form onSubmit={handleLoginSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-foreground mb-1.5">
-                Email address
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full h-11 px-4 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-foreground">Password</label>
-                <a href="#" className="text-xs text-primary hover:underline">
-                  Forgot password?
-                </a>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full h-11 pl-4 pr-11 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full h-11 rounded-xl font-bold text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-md mt-2"
-            >
-              {isLoading ? (
-                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
+          ) : (
+            <>
+              {errorMessage && (
+                <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-700">
+                  {errorMessage}
+                </div>
               )}
-            </button>
-          </form>
+
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1.5">
+                    Email address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full h-11 px-4 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-foreground">Password</label>
+                    <a href="#" className="text-xs text-primary hover:underline">
+                      Forgot password?
+                    </a>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      className="w-full h-11 pl-4 pr-11 rounded-xl border border-border bg-background text-sm outline-none focus:border-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full h-11 rounded-xl font-bold text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-md mt-2"
+                >
+                  {isLoading ? (
+                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span>Sign In</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+
+                {hasClerk && (
+                  <button
+                    type="button"
+                    onClick={() => setShowDirectLogin(false)}
+                    className="w-full text-center text-xs text-muted-foreground hover:text-primary transition-colors underline pt-2 block"
+                  >
+                    ← Back to Clerk Sign In
+                  </button>
+                )}
+              </form>
+            </>
+          )}
 
           <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground">
             Don't have an account?{' '}

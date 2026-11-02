@@ -126,7 +126,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <StatCard label="Total Courses" value={fmt(stats?.totalCourses)} sub={`${fmt(stats?.publishedCourses)} published`} icon={BookOpen} color="bg-purple-600" linkTo="/admin/courses" />
           <StatCard label="Active Enrollments" value={fmt(stats?.activeEnrollments)} sub="Students with course access" icon={ClipboardList} color="bg-cyan-600" linkTo="/admin/enrollments" />
-          <StatCard label="Lecturers" value={fmt(stats?.totalInstructors)} sub="Teaching faculty" icon={Users} color="bg-pink-600" linkTo="/admin/instructors" />
+          <StatCard label="Instructors" value={fmt(stats?.totalInstructors)} sub="Course instructors" icon={Users} color="bg-pink-600" linkTo="/admin/instructors" />
           <StatCard label="Certificates Issued" value={fmt(stats?.completedCertificates)} sub="Across all courses" icon={Award} color="bg-orange-600" linkTo="/admin/certificates" />
         </div>
 

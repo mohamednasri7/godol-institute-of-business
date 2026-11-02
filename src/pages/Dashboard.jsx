@@ -12,7 +12,8 @@ import {
   ExternalLink,
   ChevronRight,
   TrendingUp,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 import { auth } from '../lib/auth';
 import { apiFetch } from '../lib/api';
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const [enrollments, setEnrollments] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [workshops, setWorkshops] = useState([]);
+  const [settings, setSettings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // View certificate modal
@@ -73,7 +75,7 @@ export default function Dashboard() {
       if (newProgress === 100 && currentUser) {
         apiFetch(`/api/certificates?email=${encodeURIComponent(currentUser.email)}`)
           .then(setCertificates)
-          .catch(() => {});
+          .catch(() => { });
       }
     } catch (err) {
       console.error(err);
@@ -89,11 +91,11 @@ export default function Dashboard() {
 
   const initials = currentUser.name
     ? currentUser.name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
     : currentUser.email[0].toUpperCase();
 
   return (
@@ -186,11 +188,10 @@ export default function Dashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-3 text-sm font-semibold border-b-2 transition-all ${
-                  activeTab === tab.id
-                    ? 'border-accent text-white font-bold'
-                    : 'border-transparent text-white/50 hover:text-white/80'
-                }`}
+                className={`px-5 py-3 text-sm font-semibold border-b-2 transition-all ${activeTab === tab.id
+                  ? 'border-accent text-white font-bold'
+                  : 'border-transparent text-white/50 hover:text-white/80'
+                  }`}
               >
                 {tab.label}
               </button>
@@ -279,11 +280,10 @@ export default function Dashboard() {
                       <div>
                         <div className="flex items-center justify-between mb-3">
                           <span
-                            className={`text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-                              enr.progress === 100
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-primary/10 text-primary'
-                            }`}
+                            className={`text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${enr.progress === 100
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-primary/10 text-primary'
+                              }`}
                           >
                             {enr.progress === 100 ? 'Completed' : 'Active'}
                           </span>

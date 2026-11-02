@@ -101,6 +101,7 @@ const alumniReviews = [
 
 export default function About() {
   const [faculty, setFaculty] = useState([]);
+  const [settings, setSettings] = useState({});
   const [contactForm, setContactForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [isSending, setIsSending] = useState(false);
   const [sentSuccess, setSentSuccess] = useState(false);
@@ -108,6 +109,7 @@ export default function About() {
 
   useEffect(() => {
     apiFetch('/api/instructors').then(setFaculty).catch(() => {});
+    apiFetch('/api/settings').then(res => setSettings(res.map || {})).catch(() => {});
   }, []);
 
   const handleContactSubmit = async (e) => {
@@ -144,13 +146,13 @@ export default function About() {
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/20 bg-white/10 text-white/90 text-sm font-medium mb-6 backdrop-blur-sm">
             <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span>Mogadishu, Somalia — Est. 2019</span>
+            <span>{settings.home_badge_text || 'Mogadishu, Somalia — Est. 2019'}</span>
           </div>
           <h1 className="font-serif text-5xl md:text-7xl font-bold mb-6">
-            About Godol Institute
+            {settings.about_hero_title || 'About Godol Institute'}
           </h1>
           <p className="text-white/75 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-            Somalia's premier business education institution — built to empower a new generation of East African business leaders.
+            {settings.about_hero_subtitle || "Somalia's premier business education institution — built to empower a new generation of East African business leaders."}
           </p>
         </div>
       </section>
@@ -167,13 +169,13 @@ export default function About() {
                 Our Mission
               </div>
               <h2 className="font-serif text-4xl md:text-5xl font-bold mb-6 text-foreground leading-tight">
-                Business education built for East Africa, by East Africa
+                {settings.about_mission_title || 'Business education built for East Africa, by East Africa'}
               </h2>
               <p className="text-muted-foreground text-base md:text-lg leading-relaxed mb-6">
-                Godol Institute was founded in 2019 on a simple but powerful belief: Somalia and East Africa deserve world-class business education that understands their unique context, challenges, and opportunities.
+                {settings.about_mission_text || 'Godol Institute was founded in 2019 on a simple but powerful belief: Somalia and East Africa deserve world-class business education that understands their unique context, challenges, and opportunities.'}
               </p>
               <p className="text-muted-foreground text-base md:text-lg leading-relaxed mb-8">
-                Too much business education imported from the West fails to account for our markets, our legal environments, our financing realities, and our cultural business practices. We built Godol to fix that.
+                {settings.about_mission_text_secondary || 'Too much business education imported from the West fails to account for our markets, our legal environments, our financing realities, and our cultural business practices. We built Godol to fix that.'}
               </p>
               <div className="flex flex-col gap-3.5">
                 {[
@@ -326,12 +328,49 @@ export default function About() {
         </div>
       </section>
 
+      {/* Director & Leadership Message (Configurable in Dashboard) */}
+      {(settings.about_director_message || settings.about_director_name) && (
+        <section className="py-20 bg-card border-y border-border">
+          <div className="container mx-auto px-4 md:px-6">
+            <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-10">
+              <img
+                src={settings.about_director_image || '/instructor-1.png'}
+                alt={settings.about_director_name || 'Academic Director'}
+                className="w-36 h-36 md:w-44 md:h-44 rounded-3xl object-cover border-4 border-primary/20 shadow-xl flex-shrink-0"
+              />
+              <div className="space-y-4 text-center md:text-left">
+                <div
+                  className="inline-block px-3.5 py-1 rounded-full text-xs font-semibold tracking-widest uppercase"
+                  style={{ background: 'hsl(42 92% 52% / 0.15)', color: 'hsl(42 92% 40%)' }}
+                >
+                  Academic Leadership
+                </div>
+                <h3 className="font-serif text-3xl font-bold text-foreground">
+                  Message from the Academic Director
+                </h3>
+                <blockquote className="text-muted-foreground text-base md:text-lg italic leading-relaxed">
+                  "{settings.about_director_message || 'At Godol Institute, we do not teach abstract business theories from other continents. We teach practical frameworks tested in local markets, financing realities, and fast-growing regional economies.'}"
+                </blockquote>
+                <div>
+                  <p className="font-bold text-foreground text-base">
+                    {settings.about_director_name || 'Dr. Mohamed Godol'}
+                  </p>
+                  <p className="text-xs text-primary font-semibold">
+                    {settings.about_director_title || 'Founder & Academic Director'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Leadership */}
       <section className="py-20 bg-background">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-xl mx-auto mb-14">
             <h2 className="font-serif text-4xl font-bold mb-4 text-foreground">
-              Faculty & Leadership
+              Instructors & Leadership
             </h2>
             <p className="text-muted-foreground text-lg">
               Experienced practitioners and executive educators at Godol Institute of Business.
@@ -358,9 +397,9 @@ export default function About() {
             </div>
           ) : (
             <div className="bg-card border border-border rounded-2xl p-10 text-center max-w-lg mx-auto">
-              <h3 className="font-bold text-base text-foreground mb-2">Faculty & Leadership Profiles</h3>
+              <h3 className="font-bold text-base text-foreground mb-2">Instructor & Leadership Profiles</h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Lecturers and department heads will be officially listed here as new academic sessions launch.
+                Instructors and department heads will be officially listed here as new academic sessions launch.
               </p>
             </div>
           )}

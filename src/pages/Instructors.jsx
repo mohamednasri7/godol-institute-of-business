@@ -21,7 +21,7 @@ export default function Instructors() {
             className="inline-block px-3.5 py-1 rounded-full text-xs font-semibold tracking-widest uppercase mb-4"
             style={{ background: 'hsl(42 92% 52% / 0.15)', color: 'hsl(42 92% 40%)' }}
           >
-            Distinguished Faculty
+            Expert Instructors
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight mb-4 text-foreground">
             Our Instructors
@@ -47,7 +47,7 @@ export default function Instructors() {
           </div>
         ) : (
           <div className="bg-card border border-border rounded-2xl p-12 text-center max-w-md mx-auto my-12">
-            <h3 className="text-lg font-bold text-foreground mb-2">Faculty Profiles Coming Soon</h3>
+            <h3 className="text-lg font-bold text-foreground mb-2">Instructor Profiles Coming Soon</h3>
             <p className="text-sm text-muted-foreground">
               Distinguished instructors and guest executives will be listed here as courses are uploaded.
             </p>

@@ -9,6 +9,7 @@
     "start": "NODE_ENV=production node server.js"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.11",
     "@supabase/supabase-js": "^2.118.0",
     "clsx": "^2.1.1",
     "cors": "^2.8.5",

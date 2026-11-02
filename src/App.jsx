@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Switch, Route, useLocation } from 'wouter';
 import Layout from './components/Layout';
 import ChatWidget from './components/ChatWidget';
+import ClerkAuthSync from './components/ClerkAuthSync';
 
 // Pages
 import Home from './pages/Home';
@@ -67,8 +68,11 @@ function ScrollToTop() {
 }
 
 export default function App() {
+  const hasClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+
   return (
     <>
+      {hasClerk && <ClerkAuthSync />}
       <ScrollToTop />
       <Switch>
         {/* Public Routes */}

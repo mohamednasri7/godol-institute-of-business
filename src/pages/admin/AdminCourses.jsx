@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search, Plus, Edit2, Trash2, CheckCircle, XCircle,
-  Eye, BookOpen, X, Star, Users, Filter
+  Eye, BookOpen, X, Star, Users, Filter, Upload
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
@@ -34,6 +34,16 @@ export default function AdminCourses() {
 
   const fetchCourses = () => apiFetch('/api/admin/courses').then(setCourses).catch(console.error);
   useEffect(() => { fetchCourses(); }, []);
+
+  const handleThumbnailUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setForm(prev => ({ ...prev, thumbnail: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const openAdd = () => {
     setEditingCourse(null);
@@ -238,9 +248,43 @@ export default function AdminCourses() {
                   <input value={form.instructorName} onChange={e => setForm(f => ({ ...f, instructorName: e.target.value }))} className={inputCls} />
                 </Field>
               </div>
-              <Field label="Thumbnail URL">
-                <input value={form.thumbnail} onChange={e => setForm(f => ({ ...f, thumbnail: e.target.value }))} className={inputCls} placeholder="/course-business.png or https://..." />
-              </Field>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Course Thumbnail / Cover Image</label>
+                <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                  <img
+                    src={form.thumbnail || '/course-business.png'}
+                    alt="Preview"
+                    className="w-16 h-11 object-cover rounded-lg border border-gray-200 flex-shrink-0"
+                  />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 bg-primary text-white rounded-lg text-xs font-semibold hover:bg-primary/90 transition-all">
+                        <Upload className="w-3 h-3" />
+                        <span>Upload Cover</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleThumbnailUpload}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, thumbnail: '/course-business.png' }))}
+                        className="px-2 py-1 text-[11px] bg-white border border-gray-200 rounded-lg hover:bg-gray-100"
+                      >
+                        Business
+                      </button>
+                    </div>
+                    <input
+                      value={form.thumbnail}
+                      onChange={e => setForm(f => ({ ...f, thumbnail: e.target.value }))}
+                      className="w-full h-8 px-2.5 text-xs bg-white rounded-lg border border-gray-200 outline-none"
+                      placeholder="Or paste image URL (https://...)"
+                    />
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Publish Status">
                   <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inputCls}>

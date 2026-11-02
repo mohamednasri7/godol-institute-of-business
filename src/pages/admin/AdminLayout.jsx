@@ -20,7 +20,7 @@ const adminNav = [
     { path: '/admin/categories', label: 'Categories', icon: Tag }
   ]},
   { label: 'People', items: [
-    { path: '/admin/instructors', label: 'Lecturer Management', icon: Users },
+    { path: '/admin/instructors', label: 'Instructors', icon: Users },
     { path: '/admin/students', label: 'Student Management', icon: GraduationCap }
   ]},
   { label: 'Payments & Access', items: [

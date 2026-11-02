@@ -40,7 +40,7 @@ export default function Footer() {
 
   const institutionLinks = [
     { label: 'About Us', href: '/about' },
-    { label: 'Our Faculty', href: '/instructors' },
+    { label: 'Instructors', href: '/instructors' },
     { label: 'Executive Workshops', href: '/categories' },
     { label: 'Verify Certificate', href: '/verify' },
     { label: 'Contact & Admissions', href: '/contact' },

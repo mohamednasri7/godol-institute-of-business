@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createApiRouter } from './server/index.js';
+import { createApiRouter, pullFromSupabase } from './server/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +37,12 @@ if (!isProduction) {
   });
 }
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Godol Institute Server is running on http://localhost:${PORT}`);
+  try {
+    await pullFromSupabase();
+  } catch (err) {
+    console.warn('Initial Supabase sync check:', err.message);
+  }
 });
 

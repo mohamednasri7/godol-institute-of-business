@@ -27,14 +27,16 @@ export default function Home() {
   const [featuredCourses, setFeaturedCourses] = useState([]);
   const [instructors, setInstructors] = useState([]);
   const [workshops, setWorkshops] = useState([]);
+  const [settings, setSettings] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('');
 
   useEffect(() => {
-    apiFetch('/api/stats').then(setStats).catch(() => {});
-    apiFetch('/api/courses/featured').then(setFeaturedCourses).catch(() => {});
-    apiFetch('/api/instructors').then(setInstructors).catch(() => {});
-    apiFetch('/api/workshops').then(setWorkshops).catch(() => {});
+    apiFetch('/api/stats').then(setStats).catch(() => { });
+    apiFetch('/api/courses/featured').then(setFeaturedCourses).catch(() => { });
+    apiFetch('/api/instructors').then(setInstructors).catch(() => { });
+    apiFetch('/api/workshops').then(setWorkshops).catch(() => { });
+    apiFetch('/api/settings').then(res => setSettings(res.map || {})).catch(() => { });
   }, []);
 
   const handleSearchSubmit = (e) => {
@@ -130,21 +132,35 @@ export default function Home() {
 
         <div className="container mx-auto px-4 md:px-6 relative z-10 pt-32 pb-24">
           <div className="max-w-4xl mx-auto text-center">
+            {/* Top Announcement Bar if configured */}
+            {settings.announcement_banner && (
+              <div className="mb-6 inline-flex items-center gap-2 px-5 py-2 rounded-full border border-amber-400/40 bg-amber-400/15 text-amber-300 text-xs font-semibold backdrop-blur-sm shadow-md animate-pulse">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <span>{settings.announcement_banner}</span>
+              </div>
+            )}
+
             {/* Tag badge */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/20 bg-white/10 text-white/90 text-sm font-medium mb-8 backdrop-blur-sm">
               <Sparkles className="w-3.5 h-3.5 text-accent" />
-              <span>Mogadishu, Somalia — Est. 2019</span>
+              <span>{settings.home_badge_text || 'Mogadishu, Somalia — Est. 2019'}</span>
             </div>
 
             {/* Main Headline */}
             <h1 className="font-serif text-5xl md:text-7xl font-bold text-white leading-tight mb-6">
-              Shaping East Africa's
-              <span className="block text-accent">Business Leaders</span>
+              {settings.home_hero_title ? (
+                <span>{settings.home_hero_title}</span>
+              ) : (
+                <>
+                  Shaping East Africa's
+                  <span className="block text-accent">Business Leaders</span>
+                </>
+              )}
             </h1>
 
             {/* Subtitle */}
             <p className="text-white/75 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
-              Godol Institute delivers world-class business education rooted in the realities of the Somali and East African market. Online courses, live workshops, and a network of professionals who are building the future of this region.
+              {settings.home_hero_subtitle || 'Godol Institute delivers world-class business education rooted in the realities of the Somali and East African market. Online courses, live workshops, and a network of professionals who are building the future of this region.'}
             </p>
 
             {/* Action Buttons */}
@@ -355,8 +371,8 @@ export default function Home() {
                         w.tag === 'Limited Seats'
                           ? { background: 'hsl(0 84% 60% / 0.1)', color: 'hsl(0 84% 50%)' }
                           : w.tag === 'New'
-                          ? { background: 'hsl(42 92% 52% / 0.15)', color: 'hsl(42 92% 38%)' }
-                          : { background: 'hsl(215 72% 24% / 0.1)', color: 'hsl(215 72% 30%)' }
+                            ? { background: 'hsl(42 92% 52% / 0.15)', color: 'hsl(42 92% 38%)' }
+                            : { background: 'hsl(215 72% 24% / 0.1)', color: 'hsl(215 72% 30%)' }
                       }
                     >
                       {w.tag || 'Upcoming'}
@@ -504,12 +520,12 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Faculty & Instructors Section */}
+      {/* Instructors Section */}
       <section className="py-24 bg-background">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="font-serif text-4xl md:text-5xl font-bold mb-4 text-foreground">
-              Faculty & Experts
+              Instructors & Experts
             </h2>
             <p className="text-muted-foreground text-lg">
               Practitioners who have built companies, led teams, and shaped industries — now sharing what they know.
@@ -525,9 +541,9 @@ export default function Home() {
           ) : (
             <div className="bg-card border border-border rounded-2xl p-10 text-center max-w-lg mx-auto">
               <Users className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-              <h3 className="font-bold text-base text-foreground mb-1">Faculty Profiles Coming Soon</h3>
+              <h3 className="font-bold text-base text-foreground mb-1">Instructor Profiles Coming Soon</h3>
               <p className="text-xs text-muted-foreground">
-                Our faculty and lecturer profiles will be introduced alongside upcoming academic programs.
+                Our instructor and expert profiles will be introduced alongside upcoming academic programs.
               </p>
             </div>
           )}
