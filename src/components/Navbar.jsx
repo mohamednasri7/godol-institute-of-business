@@ -58,7 +58,7 @@ export default function Navbar() {
           <img
             src="/godol-logo.png"
             alt="Godol Institute of Business"
-            className={`h-12 w-auto object-contain transition-all duration-300 ${
+            className={`h-9 sm:h-10 md:h-12 max-h-12 w-auto object-contain transition-all duration-300 ${
               isTransparent ? 'brightness-0 invert' : 'dark:brightness-0 dark:invert'
             }`}
           />

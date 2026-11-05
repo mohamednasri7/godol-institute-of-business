@@ -42,7 +42,7 @@ export default function AdminLogin() {
             <img
               src="/godol-logo.png"
               alt="Godol"
-              className="h-12 mx-auto mb-4 brightness-0 invert object-contain"
+              className="h-10 sm:h-12 mx-auto mb-4 brightness-0 invert object-contain w-auto"
             />
             <div className="flex items-center justify-center gap-2 text-white/80 text-xs font-semibold">
               <Shield className="w-4 h-4 text-accent" />

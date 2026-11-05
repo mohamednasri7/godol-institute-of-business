@@ -54,7 +54,7 @@ export default function InstructorLogin() {
             <img
               src="/godol-logo.png"
               alt="Godol Institute"
-              className="h-14 mx-auto object-contain brightness-0 invert"
+              className="h-10 sm:h-12 md:h-14 mx-auto object-contain brightness-0 invert w-auto"
             />
           </Link>
           <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold tracking-wider uppercase border border-amber-500/30">

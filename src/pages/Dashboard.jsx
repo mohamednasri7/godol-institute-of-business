@@ -446,7 +446,7 @@ export default function Dashboard() {
               <img
                 src="/godol-logo.png"
                 alt="Godol Institute"
-                className="h-14 mx-auto object-contain"
+                className="h-11 sm:h-14 mx-auto object-contain w-auto"
               />
               <div className="text-xs tracking-widest uppercase font-semibold text-primary">
                 Certificate of Completion

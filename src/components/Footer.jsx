@@ -66,7 +66,7 @@ export default function Footer() {
               <img
                 src="/godol-logo.png"
                 alt="Godol Institute of Business"
-                className="h-14 w-auto object-contain brightness-0 invert opacity-90"
+                className="h-10 sm:h-12 md:h-14 w-auto object-contain brightness-0 invert opacity-95 transition-opacity hover:opacity-100"
               />
             </Link>
             <p className="text-white/60 mb-6 max-w-sm leading-relaxed text-sm">

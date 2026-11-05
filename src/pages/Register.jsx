@@ -73,7 +73,7 @@ export default function Register() {
             <img
               src="/godol-logo.png"
               alt="Godol Institute"
-              className="h-12 w-auto object-contain brightness-0 invert"
+              className="h-10 md:h-12 w-auto object-contain brightness-0 invert"
             />
           </Link>
         </div>
@@ -117,7 +117,7 @@ export default function Register() {
               <img
                 src="/godol-logo.png"
                 alt="Godol Institute"
-                className="h-12 w-auto object-contain"
+                className="h-10 sm:h-12 w-auto object-contain dark:brightness-0 dark:invert"
               />
             </Link>
           </div>

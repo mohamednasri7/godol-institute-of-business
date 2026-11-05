@@ -75,7 +75,7 @@ export default function AdminLayout({ children, title, subtitle }) {
         {/* Brand */}
         <div className="px-5 py-5 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <img src="/godol-logo.png" alt="Godol" className="h-8 brightness-0 invert object-contain" />
+            <img src="/godol-logo.png" alt="Godol" className="h-8 sm:h-9 max-w-[190px] w-auto brightness-0 invert object-contain" />
           </div>
           <div className="mt-1.5 text-[10px] text-white/40 font-semibold tracking-widest uppercase">Admin Console</div>
         </div>
