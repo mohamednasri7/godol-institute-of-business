@@ -82,24 +82,27 @@ export default function Home() {
 
   const testimonials = [
     {
-      name: 'Faadumo Omar',
-      role: 'Founder, Dalmar Foods',
+      name: 'Practical Frameworks',
+      role: 'Market-Tested Curriculum',
+      initials: 'PF',
       quote:
-        "Godol Institute's Entrepreneurship program gave me the tools and confidence to turn my family recipe business into a company with 40 employees. The instructors understand the Somali market.",
+        'Every concept taught inside our programs is grounded in practical case studies and modern market tools. You study real financial, management, and operational frameworks you can apply directly to your enterprise on day one.',
       rating: 5
     },
     {
-      name: 'Abdirizak Mohamed',
-      role: 'CFO, Amal Bank',
+      name: 'Active Problem Solving',
+      role: 'Collaborative & Project-Based',
+      initials: 'AP',
       quote:
-        'The Financial Management course was exactly what I needed to advance my career. Rigorous content, practical case studies, and a network of serious professionals.',
+        'We reject pure theoretical lectures. Our learning model combines structured self-study with live, scenario-based workshops where students break down real regional business challenges in collaborative sprints.',
       rating: 5
     },
     {
-      name: 'Hodan Ali',
-      role: 'Marketing Director, SomTel',
+      name: 'Regional Relevance',
+      role: 'Localized Strategy & Direct Feedback',
+      initials: 'RR',
       quote:
-        'I enrolled in the Digital Marketing workshop and within three months our online sales doubled. The instructors bring real expertise — not just theory.',
+        'Global business principles adapted to local realities. Our programs connect learners with seasoned mentors who understand the regulatory, operational, and commercial landscape of Somalia and East Africa.',
       rating: 5
     }
   ];
@@ -459,7 +462,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Alumni Testimonials Section */}
+      {/* Value Pillars / Built for Real-World Business Impact */}
       <section className="py-24 section-dark relative overflow-hidden">
         <div
           className="absolute inset-0 opacity-5"
@@ -470,12 +473,12 @@ export default function Home() {
           }}
         />
         <div className="container mx-auto px-4 md:px-6 relative z-10">
-          <div className="text-center max-w-xl mx-auto mb-16">
+          <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="font-serif text-4xl md:text-5xl font-bold text-white mb-4">
-              What Our Alumni Say
+              Built for Real-World Business Impact
             </h2>
             <p className="text-white/60 text-lg">
-              Graduates who are now leading businesses across East Africa.
+              Designed from the ground up to equip professionals and entrepreneurs across East Africa with immediate, actionable capability.
             </p>
           </div>
 
@@ -483,7 +486,7 @@ export default function Home() {
             {testimonials.map((item) => (
               <div
                 key={item.name}
-                className="rounded-2xl p-7 h-full flex flex-col"
+                className="rounded-2xl p-7 h-full flex flex-col backdrop-blur-sm"
                 style={{
                   background: 'rgba(255,255,255,0.06)',
                   border: '1px solid rgba(255,255,255,0.1)'
@@ -496,15 +499,15 @@ export default function Home() {
                       <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
                     ))}
                 </div>
-                <p className="text-white/80 leading-relaxed flex-grow mb-6 italic text-sm">
+                <p className="text-white/85 leading-relaxed flex-grow mb-6 italic text-sm">
                   "{item.quote}"
                 </p>
                 <div className="flex items-center gap-3 pt-4 border-t border-white/10">
                   <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm"
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs shrink-0 shadow-sm"
                     style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
                   >
-                    {item.name
+                    {item.initials || item.name
                       .split(' ')
                       .map((n) => n[0])
                       .join('')}

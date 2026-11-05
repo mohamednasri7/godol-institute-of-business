@@ -52,45 +52,27 @@ const timeline = [
 
 const alumniReviews = [
   {
-    name: 'Faadumo Omar',
-    role: 'Founder, Dalmar Foods Co.',
+    name: 'Practical Frameworks',
+    role: 'Market-Tested Curriculum',
+    initials: 'PF',
     quote:
-      'Godol Institute gave me the business frameworks and confidence to scale my family recipe business into a company with 40 employees. The instructors understand the Somali market deeply.',
+      'Every concept taught inside our programs is grounded in practical case studies and modern market tools. You study real financial, management, and operational frameworks you can apply directly to your enterprise on day one.',
     rating: 5
   },
   {
-    name: 'Abdirizak Mohamed',
-    role: 'CFO, Amal Bank',
+    name: 'Active Problem Solving',
+    role: 'Collaborative & Project-Based',
+    initials: 'AP',
     quote:
-      'The Financial Management program was exactly what I needed to advance my career. Rigorous content, practical case studies, and a network of genuinely serious professionals.',
+      'We reject pure theoretical lectures. Our learning model combines structured self-study with live, scenario-based workshops where students break down real regional business challenges in collaborative sprints.',
     rating: 5
   },
   {
-    name: 'Hodan Ali',
-    role: 'Marketing Director, SomTel',
+    name: 'Regional Relevance',
+    role: 'Localized Strategy & Direct Feedback',
+    initials: 'RR',
     quote:
-      "After completing the Digital Marketing workshop, our online sales doubled within three months. These aren't just theories — they're tools that work in the Somali context.",
-    rating: 5
-  },
-  {
-    name: 'Yusuf Ibrahim',
-    role: 'CEO, Horyaal Transport',
-    quote:
-      'The Leadership program transformed how I run my company. My team is more engaged, decisions are faster, and we grew 60% last year. I send every one of my managers here now.',
-    rating: 5
-  },
-  {
-    name: 'Safiya Hassan',
-    role: 'Entrepreneur & Godol Scholar',
-    quote:
-      'As a scholarship recipient, Godol changed the trajectory of my life. I started a trading company three months after graduating. This institution believes in Somali women.',
-    rating: 5
-  },
-  {
-    name: 'Omar Farah',
-    role: 'Finance Manager, Dahabshiil',
-    quote:
-      'The Accounting and Finance course is structured better than what I studied at university. Real-world, practical, and taught by people who actually work in finance in Somalia.',
+      'Global business principles adapted to local realities. Our programs connect learners with seasoned mentors who understand the regulatory, operational, and commercial landscape of Somalia and East Africa.',
     rating: 5
   }
 ];
@@ -271,23 +253,31 @@ export default function About() {
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Value Pillars / Institute Commitment Section */}
       <section id="testimonials" className="py-20 section-dark relative overflow-hidden text-white">
+        <div
+          className="absolute inset-0 opacity-5"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+            backgroundSize: '60px 60px'
+          }}
+        />
         <div className="container mx-auto px-4 md:px-6 relative z-10">
-          <div className="text-center max-w-xl mx-auto mb-14">
+          <div className="text-center max-w-2xl mx-auto mb-14">
             <h2 className="font-serif text-4xl md:text-5xl font-bold mb-4">
-              What Our Alumni Say
+              Built for Real-World Business Impact
             </h2>
             <p className="text-white/60 text-lg">
-              Graduates who are now leading businesses and careers across East Africa.
+              Designed from the ground up to equip professionals and entrepreneurs across East Africa with immediate, actionable capability.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {alumniReviews.map((item) => (
               <div
                 key={item.name}
-                className="rounded-2xl p-7 h-full flex flex-col"
+                className="rounded-2xl p-7 h-full flex flex-col backdrop-blur-sm"
                 style={{
                   background: 'rgba(255,255,255,0.06)',
                   border: '1px solid rgba(255,255,255,0.1)'
@@ -305,10 +295,10 @@ export default function About() {
                 </p>
                 <div className="flex items-center gap-3 pt-4 border-t border-white/10">
                   <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs"
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs shrink-0"
                     style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
                   >
-                    {item.name
+                    {item.initials || item.name
                       .split(' ')
                       .map((n) => n[0])
                       .join('')}
