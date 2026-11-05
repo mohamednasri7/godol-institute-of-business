@@ -19,6 +19,7 @@ const APPROVAL_COLOR = {
 
 export default function AdminCourses() {
   const [courses, setCourses] = useState([]);
+  const [instructors, setInstructors] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showModal, setShowModal] = useState(false);
@@ -26,14 +27,18 @@ export default function AdminCourses() {
   const [toast, setToast] = useState(null);
   const [form, setForm] = useState({
     title: '', description: '', price: 0, level: 'Beginner',
-    categoryName: '', instructorName: '', thumbnail: '',
+    categoryName: '', instructorId: null, instructorName: '', thumbnail: '',
     status: 'draft', approvalStatus: 'pending', featured: false
   });
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
   const fetchCourses = () => apiFetch('/api/admin/courses').then(setCourses).catch(console.error);
-  useEffect(() => { fetchCourses(); }, []);
+  const fetchInstructors = () => apiFetch('/api/admin/instructors').then(setInstructors).catch(() => {});
+  useEffect(() => {
+    fetchCourses();
+    fetchInstructors();
+  }, []);
 
   const handleThumbnailUpload = (e) => {
     const file = e.target.files?.[0];
@@ -47,13 +52,23 @@ export default function AdminCourses() {
 
   const openAdd = () => {
     setEditingCourse(null);
-    setForm({ title: '', description: '', price: 0, level: 'Beginner', categoryName: '', instructorName: '', thumbnail: '', status: 'draft', approvalStatus: 'pending', featured: false });
+    setForm({
+      title: '', description: '', price: 0, level: 'Beginner',
+      categoryName: '', instructorId: instructors[0]?.id || null,
+      instructorName: instructors[0]?.name || '',
+      thumbnail: '', status: 'draft', approvalStatus: 'pending', featured: false
+    });
     setShowModal(true);
   };
 
   const openEdit = (c) => {
     setEditingCourse(c);
-    setForm({ title: c.title, description: c.description, price: c.price, level: c.level, categoryName: c.categoryName, instructorName: c.instructorName, thumbnail: c.thumbnail || '', status: c.status, approvalStatus: c.approvalStatus, featured: !!c.featured });
+    setForm({
+      title: c.title, description: c.description, price: c.price, level: c.level,
+      categoryName: c.categoryName, instructorId: c.instructorId || null,
+      instructorName: c.instructorName || '',
+      thumbnail: c.thumbnail || '', status: c.status, approvalStatus: c.approvalStatus, featured: !!c.featured
+    });
     setShowModal(true);
   };
 
@@ -244,8 +259,27 @@ export default function AdminCourses() {
                 <Field label="Category">
                   <input value={form.categoryName} onChange={e => setForm(f => ({ ...f, categoryName: e.target.value }))} className={inputCls} placeholder="e.g. Business Strategy" />
                 </Field>
-                <Field label="Instructor Name">
-                  <input value={form.instructorName} onChange={e => setForm(f => ({ ...f, instructorName: e.target.value }))} className={inputCls} />
+                <Field label="Faculty Instructor">
+                  <select
+                    value={form.instructorId || ''}
+                    onChange={e => {
+                      const id = Number(e.target.value);
+                      const inst = instructors.find(i => i.id === id);
+                      setForm(f => ({
+                        ...f,
+                        instructorId: id || null,
+                        instructorName: inst ? inst.name : ''
+                      }));
+                    }}
+                    className={inputCls}
+                  >
+                    <option value="">Select Instructor...</option>
+                    {instructors.map(inst => (
+                      <option key={inst.id} value={inst.id}>
+                        {inst.name} ({inst.title})
+                      </option>
+                    ))}
+                  </select>
                 </Field>
               </div>
               <div>

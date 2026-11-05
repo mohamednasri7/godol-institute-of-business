@@ -73,8 +73,8 @@ export default function Privacy() {
             </p>
             <div className="mt-3 p-4 bg-muted/40 rounded-2xl">
               <p className="font-bold text-foreground">Godol Institute of Business — Registrar & Data Compliance</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Makka Al-Mukarama Road, Mogadishu, Somalia</p>
-              <p className="text-xs text-primary font-medium mt-1">Email: info@godolinstitute.so • Phone: +252 61 000 0000</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Bosaso, Somalia</p>
+              <p className="text-xs text-primary font-medium mt-1">Email: info@godolinstitute.so • Phone: +252 905139816</p>
             </div>
           </div>
         </div>

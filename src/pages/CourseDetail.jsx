@@ -438,7 +438,7 @@ export default function CourseDetail() {
               {getActionButton()}
 
               <a
-                href={`https://wa.me/252610000000?text=${encodeURIComponent(`Hi Godol Institute, I have questions regarding the "${course.title}" program.`)}`}
+                href={`https://wa.me/252905139816?text=${encodeURIComponent(`Hi Godol Institute, I have questions regarding the "${course.title}" program.`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full py-2.5 rounded-full border border-emerald-500/30 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold text-xs text-center flex items-center justify-center gap-1.5 transition-colors"

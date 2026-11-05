@@ -221,11 +221,19 @@ export default function Login() {
             </>
           )}
 
-          <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground">
-            Don't have an account?{' '}
-            <Link href="/register" className="text-primary font-bold hover:underline">
-              Enroll at Godol Institute
-            </Link>
+          <div className="mt-8 pt-6 border-t border-border text-center text-xs text-muted-foreground space-y-2">
+            <div>
+              Don't have an account?{' '}
+              <Link href="/register" className="text-primary font-bold hover:underline">
+                Enroll at Godol Institute
+              </Link>
+            </div>
+            <div>
+              Are you a faculty member?{' '}
+              <Link href="/instructor/login" className="text-amber-600 font-bold hover:underline">
+                Instructor Portal Login →
+              </Link>
+            </div>
           </div>
         </div>
       </div>

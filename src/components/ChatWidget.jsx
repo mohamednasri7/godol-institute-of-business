@@ -30,7 +30,7 @@ const answers = {
     "We'd love to connect with you directly! Click 'Chat on WhatsApp' below to speak immediately with a Godol Institute admissions counselor."
 };
 
-const WHATSAPP_NUMBER = '252610000000';
+const WHATSAPP_NUMBER = '252905139816';
 
 export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
@@ -174,7 +174,7 @@ export default function ChatWidget() {
               className="flex items-center justify-center gap-2 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium text-xs transition-colors shadow-sm"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>Chat on WhatsApp (+252 61 000 0000)</span>
+              <span>Chat on WhatsApp (+252 905139816)</span>
             </button>
           </div>
         </div>

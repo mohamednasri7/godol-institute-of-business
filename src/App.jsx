@@ -23,6 +23,10 @@ import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
 import NotFound from './pages/NotFound';
 
+// Instructor Pages
+import InstructorLogin from './pages/instructor/InstructorLogin';
+import InstructorDashboard from './pages/instructor/InstructorDashboard';
+
 // Admin Pages
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -123,6 +127,11 @@ export default function App() {
         {/* Auth */}
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
+
+        {/* Instructor Portal */}
+        <Route path="/instructor/login" component={InstructorLogin} />
+        <Route path="/instructor/dashboard" component={InstructorDashboard} />
+        <Route path="/instructor" component={InstructorDashboard} />
 
         {/* Admin Portal */}
         <Route path="/admin" component={AdminLogin} />

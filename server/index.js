@@ -23,6 +23,7 @@ function loadDB() {
     if (!data.notifications) data.notifications = initialData.notifications || [];
     if (!data.enquiries) data.enquiries = [];
     if (!data.newsletter_subscribers) data.newsletter_subscribers = [];
+    if (!data.instructor_applications) data.instructor_applications = [];
     return data;
   } catch (err) {
     return JSON.parse(JSON.stringify(initialData));
@@ -125,10 +126,26 @@ export async function pullFromSupabase() {
     const db = loadDB();
     let updated = false;
 
+    const currentDb = loadDB();
     for (const [localKey, supabaseTable] of Object.entries(LOCAL_TO_SUPABASE)) {
       const { data, error } = await supabase.from(supabaseTable).select('*');
       if (!error && Array.isArray(data)) {
-        db[localKey] = data.map(rowToCamel);
+        if (localKey === 'instructors') {
+          db.instructors = data.map(row => {
+            const inst = rowToCamel(row);
+            const existing = (currentDb.instructors || []).find(i => i.id === inst.id);
+            if (!inst.password && existing?.password) inst.password = existing.password;
+            if (!inst.password) inst.password = 'godol2026';
+            if (!inst.email && existing?.email) inst.email = existing.email;
+            if (!inst.email) {
+              const clean = (inst.name || 'instructor').toLowerCase().replace(/[^a-z0-9]/g, '');
+              inst.email = `${clean}@godolinstitute.so`;
+            }
+            return inst;
+          });
+        } else {
+          db[localKey] = data.map(rowToCamel);
+        }
         updated = true;
       }
     }
@@ -185,6 +202,29 @@ if (isSupabaseConfigured) {
 
 function saveDB(data) {
   lastSyncTime = Date.now();
+
+  // Ensure every instructor has email and password, and backup credentials
+  if (data.instructors && Array.isArray(data.instructors)) {
+    data.settings = data.settings || [];
+    data.instructors.forEach(inst => {
+      if (!inst.email) {
+        const clean = (inst.name || 'instructor').toLowerCase().replace(/[^a-z0-9]/g, '');
+        inst.email = `${clean}@godolinstitute.so`;
+      }
+      if (!inst.password) {
+        inst.password = 'godol2026';
+      }
+      const key = `instructor_auth_${inst.id}`;
+      const val = JSON.stringify({ email: inst.email, password: inst.password, name: inst.name });
+      const idx = data.settings.findIndex(s => s.key === key);
+      if (idx >= 0) {
+        data.settings[idx].value = val;
+      } else {
+        data.settings.push({ key, value: val, group: 'instructor_auth', label: `Credentials for ${inst.name}` });
+      }
+    });
+  }
+
   fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
 
   // If Supabase is configured, sync every table in background
@@ -1371,14 +1411,39 @@ export function createApiRouter() {
       const revenue = db.payments.filter(p =>
         p.status === 'verified' && courses.some(c => c.id === p.courseId)
       ).reduce((s, p) => s + Number(p.verifiedAmount || 0), 0);
-      return { ...inst, courseCount: courses.length, enrollmentCount, revenue };
+      return {
+        ...inst,
+        status: inst.status || 'verified',
+        courseCount: courses.length,
+        enrollmentCount,
+        revenue,
+        assignedCourses: courses.map(c => ({ id: c.id, title: c.title, price: c.price, level: c.level }))
+      };
     });
     res.json(instructors);
   });
 
   router.post('/admin/instructors', (req, res) => {
     const db = loadDB();
-    const inst = { ...req.body, id: nextId(db.instructors), status: 'active', joinedAt: new Date().toISOString() };
+    const inst = {
+      ...req.body,
+      id: nextId(db.instructors),
+      status: req.body.status || 'verified',
+      rating: req.body.rating || 4.9,
+      reviewCount: req.body.reviewCount || 50,
+      studentCount: req.body.studentCount || 100,
+      courseCount: req.body.courseCount || 0,
+      joinedAt: new Date().toISOString(),
+      verifiedAt: new Date().toISOString(),
+      verifiedBy: 'admin@godolinstitute.so'
+    };
+    if (!inst.email) {
+      const clean = (inst.name || 'instructor').toLowerCase().replace(/[^a-z0-9]/g, '');
+      inst.email = `${clean}@godolinstitute.so`;
+    }
+    if (!inst.password) {
+      inst.password = 'godol2026';
+    }
     db.instructors.push(inst);
     db.stats.totalInstructors = db.instructors.length;
     saveDB(db);
@@ -1403,6 +1468,299 @@ export function createApiRouter() {
     saveDB(db);
     deleteFromSupabase('instructors', id);
     res.json({ success: true });
+  });
+
+  // Admin logs when credentials were sent via WhatsApp or Email
+  router.post('/admin/instructors/:id/log-dispatch', (req, res) => {
+    const db = loadDB();
+    const id = Number(req.params.id);
+    const idx = db.instructors.findIndex(i => i.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Instructor not found' });
+    const method = req.body.method || 'whatsapp';
+    db.instructors[idx].credentialsSentVia = method;
+    db.instructors[idx].credentialsSentAt = new Date().toISOString();
+    saveDB(db);
+    res.json({ success: true, instructor: db.instructors[idx] });
+  });
+
+  // Admin directly creates a course assigned to this instructor
+  router.post('/admin/instructors/:id/create-course', (req, res) => {
+    const db = loadDB();
+    const id = Number(req.params.id);
+    const inst = db.instructors.find(i => i.id === id);
+    if (!inst) return res.status(404).json({ error: 'Instructor not found' });
+
+    const newCourse = {
+      ...req.body,
+      id: nextId(db.courses),
+      instructorId: id,
+      instructorName: inst.name,
+      status: req.body.status || 'published',
+      approvalStatus: 'approved',
+      enrolledCount: 0,
+      rating: 5.0,
+      createdAt: new Date().toISOString()
+    };
+    db.courses.push(newCourse);
+    inst.courseCount = (inst.courseCount || 0) + 1;
+    db.stats.totalCourses = db.courses.length;
+    saveDB(db);
+    res.status(201).json(newCourse);
+  });
+
+  // Admin writes a blog article under this instructor's name
+  router.post('/admin/instructors/:id/create-blog', (req, res) => {
+    const db = loadDB();
+    const id = Number(req.params.id);
+    const inst = db.instructors.find(i => i.id === id);
+    if (!inst) return res.status(404).json({ error: 'Instructor not found' });
+
+    const post = {
+      ...req.body,
+      id: nextId(db.blog || []),
+      author: inst.name,
+      published: true,
+      publishedAt: new Date().toISOString()
+    };
+    db.blog = db.blog || [];
+    db.blog.unshift(post);
+    saveDB(db);
+    res.status(201).json(post);
+  });
+
+  // Public application form: Prospective instructor applies online
+  router.post('/instructors/apply', (req, res) => {
+    const db = loadDB();
+    const { name, email, phone, title, bio, expertise } = req.body || {};
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Please provide at least your full name and email address.' });
+    }
+
+    const application = {
+      id: nextId(db.instructor_applications || []),
+      name,
+      email,
+      phone: phone || '',
+      title: title || 'Executive Instructor Applicant',
+      bio: bio || '',
+      expertise: expertise || 'Business Leadership',
+      status: 'pending_verification',
+      appliedAt: new Date().toISOString()
+    };
+
+    db.instructor_applications = db.instructor_applications || [];
+    db.instructor_applications.unshift(application);
+
+    // Also notify admin
+    db.notifications = db.notifications || [];
+    db.notifications.unshift({
+      id: nextId(db.notifications),
+      type: 'instructor_application',
+      studentEmail: 'admin@godolinstitute.so',
+      message: `New instructor application from ${name} (${email}, ${phone || 'no phone'}). Awaiting admin verification.`,
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+
+    saveDB(db);
+    res.status(201).json({ success: true, application });
+  });
+
+  // Admin gets all instructor applications
+  router.get('/admin/instructor-applications', (req, res) => {
+    const db = loadDB();
+    res.json(db.instructor_applications || []);
+  });
+
+  // Admin verifies & approves an application, manually assigns credentials
+  router.post('/admin/instructor-applications/:id/verify', (req, res) => {
+    const db = loadDB();
+    const appId = Number(req.params.id);
+    db.instructor_applications = db.instructor_applications || [];
+    const appIdx = db.instructor_applications.findIndex(a => a.id === appId);
+    if (appIdx === -1) return res.status(404).json({ error: 'Application not found' });
+
+    const app = db.instructor_applications[appIdx];
+    const { email, password, title, bio, rating, phone } = req.body || {};
+
+    // Check if instructor with this email already exists
+    let inst = db.instructors.find(i => i.email && i.email.toLowerCase() === (email || app.email).toLowerCase());
+    if (inst) {
+      inst.status = 'verified';
+      if (password) inst.password = password;
+      if (title) inst.title = title;
+      if (bio) inst.bio = bio;
+      if (phone) inst.phone = phone;
+    } else {
+      inst = {
+        id: nextId(db.instructors),
+        name: app.name,
+        title: title || app.title || 'Executive Instructor',
+        bio: bio || app.bio || `Specialist in ${app.expertise || 'business strategy'}.`,
+        avatar: '/instructor-1.png',
+        email: email || app.email,
+        phone: phone || app.phone,
+        password: password || 'godol2026',
+        rating: Number(rating) || 4.9,
+        reviewCount: 20,
+        studentCount: 50,
+        courseCount: 0,
+        status: 'verified',
+        joinedAt: new Date().toISOString(),
+        verifiedAt: new Date().toISOString(),
+        verifiedBy: 'admin@godolinstitute.so'
+      };
+      db.instructors.push(inst);
+    }
+
+    app.status = 'approved';
+    app.approvedAt = new Date().toISOString();
+    db.stats.totalInstructors = db.instructors.length;
+    saveDB(db);
+
+    res.json({ success: true, instructor: inst, application: app });
+  });
+
+  // ─────────── INSTRUCTOR PORTAL API ───────────
+
+  // Instructor Login
+  router.post('/instructor/login', (req, res) => {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Please enter both your instructor email and password.' });
+    }
+    const db = loadDB();
+    const cleanEmail = email.trim().toLowerCase();
+    const instructor = db.instructors.find(i => 
+      i.email && i.email.trim().toLowerCase() === cleanEmail
+    );
+    if (!instructor) {
+      return res.status(401).json({ error: 'No instructor account found with that email. Contact the administrator.' });
+    }
+    if (instructor.password && instructor.password !== password) {
+      return res.status(401).json({ error: 'Incorrect password. Contact administrator for assistance.' });
+    }
+
+    const assignedCourses = db.courses.filter(c => c.instructorId === instructor.id);
+
+    res.json({
+      token: `godol_inst_token_${instructor.id}_${Date.now()}`,
+      instructor: {
+        id: instructor.id,
+        name: instructor.name,
+        title: instructor.title,
+        email: instructor.email,
+        phone: instructor.phone,
+        avatar: instructor.avatar,
+        bio: instructor.bio,
+        rating: instructor.rating || 4.9,
+        courseCount: assignedCourses.length
+      }
+    });
+  });
+
+  // Instructor Dashboard Data
+  router.get('/instructor/dashboard', (req, res) => {
+    const instructorId = Number(req.query.id);
+    if (!instructorId) {
+      return res.status(400).json({ error: 'Instructor ID is required' });
+    }
+    const db = loadDB();
+    const instructor = db.instructors.find(i => i.id === instructorId);
+    if (!instructor) {
+      return res.status(404).json({ error: 'Instructor not found' });
+    }
+
+    const myCourses = db.courses.filter(c => c.instructorId === instructorId);
+    const myCourseIds = myCourses.map(c => c.id);
+
+    // Enrollments in this instructor's courses
+    const myEnrollments = db.enrollments.filter(e => myCourseIds.includes(e.courseId));
+    const activeStudents = myEnrollments.filter(e => e.accessGranted);
+
+    // Certificates issued in this instructor's courses
+    const myCertificates = db.certificates.filter(cert => myCourseIds.includes(cert.courseId));
+
+    // Metrics
+    const totalStudents = activeStudents.length;
+    const completedStudents = activeStudents.filter(e => e.progress === 100).length;
+    const inProgressStudents = activeStudents.filter(e => e.progress > 0 && e.progress < 100).length;
+    const avgProgress = activeStudents.length
+      ? Math.round(activeStudents.reduce((acc, cur) => acc + (cur.progress || 0), 0) / activeStudents.length)
+      : 0;
+
+    res.json({
+      instructor: {
+        id: instructor.id,
+        name: instructor.name,
+        title: instructor.title,
+        email: instructor.email,
+        phone: instructor.phone,
+        avatar: instructor.avatar,
+        bio: instructor.bio,
+        rating: instructor.rating || 4.9
+      },
+      stats: {
+        totalCourses: myCourses.length,
+        totalStudents,
+        completedStudents,
+        inProgressStudents,
+        avgProgress,
+        certificatesIssued: myCertificates.length
+      },
+      courses: myCourses.map(c => ({
+        ...c,
+        studentsCount: activeStudents.filter(e => e.courseId === c.id).length
+      })),
+      enrollments: myEnrollments.map(e => ({
+        ...e,
+        courseTitle: myCourses.find(c => c.id === e.courseId)?.title || e.courseTitle
+      })),
+      certificates: myCertificates
+    });
+  });
+
+  // Update Instructor Profile from their dashboard
+  router.patch('/instructor/profile', (req, res) => {
+    const { id, bio, phone, avatar, password, title } = req.body || {};
+    const instructorId = Number(id);
+    if (!instructorId) {
+      return res.status(400).json({ error: 'Instructor ID is required' });
+    }
+    const db = loadDB();
+    const idx = db.instructors.findIndex(i => i.id === instructorId);
+    if (idx === -1) {
+      return res.status(404).json({ error: 'Instructor not found' });
+    }
+    if (bio !== undefined) db.instructors[idx].bio = bio;
+    if (phone !== undefined) db.instructors[idx].phone = phone;
+    if (avatar !== undefined) db.instructors[idx].avatar = avatar;
+    if (title !== undefined) db.instructors[idx].title = title;
+    if (password && password.trim().length >= 4) {
+      db.instructors[idx].password = password.trim();
+    }
+    saveDB(db);
+    res.json({ success: true, instructor: db.instructors[idx] });
+  });
+
+  // Instructor post a course announcement
+  router.post('/instructor/announcements', (req, res) => {
+    const { instructorId, courseId, title, message } = req.body || {};
+    const db = loadDB();
+    db.notifications = db.notifications || [];
+    const enrollments = db.enrollments.filter(e => e.courseId === Number(courseId) && e.accessGranted);
+    enrollments.forEach(e => {
+      db.notifications.unshift({
+        id: nextId(db.notifications),
+        type: 'course_announcement',
+        studentEmail: e.studentEmail,
+        message: `${title}: ${message}`,
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    });
+    saveDB(db);
+    res.json({ success: true, recipients: enrollments.length });
   });
 
   // ─────────── ADMIN WORKSHOPS ───────────

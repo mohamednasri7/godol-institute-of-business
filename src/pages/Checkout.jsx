@@ -75,10 +75,10 @@ export default function Checkout() {
         };
       case 'Sahal':
         return {
-          phone: providers.sahal_phone || '252900000000',
+          phone: providers.sahal_phone || '252905139816',
           name: providers.sahal_name || 'Godol Institute of Business',
-          instructions: `Transfer to number ${providers.sahal_phone || '252900000000'} on Amtel Sahal`,
-          dialCode: providers.sahal_phone || '252900000000'
+          instructions: `Transfer to number ${providers.sahal_phone || '252905139816'} on Golis Sahal`,
+          dialCode: providers.sahal_phone || '252905139816'
         };
       case 'Premier Wallet':
         return {

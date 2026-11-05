@@ -265,7 +265,7 @@ export default function Courses() {
               Our academic faculty is currently finalizing the upcoming cohort course catalog. Check back shortly or contact our admissions team on WhatsApp to register early.
             </p>
             <a
-              href="https://wa.me/252610000000?text=Hi%20Godol%20Institute,%20I%20would%20like%20to%20inquire%20about%20upcoming%20courses."
+              href="https://wa.me/252905139816?text=Hi%20Godol%20Institute,%20I%20would%20like%20to%20inquire%20about%20upcoming%20courses."
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-full text-xs font-semibold hover:bg-primary/90 transition-all shadow-sm"

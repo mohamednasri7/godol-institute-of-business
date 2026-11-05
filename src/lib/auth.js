@@ -1,4 +1,4 @@
-// Student & Admin Auth Store
+// Student, Admin & Instructor Auth Store
 export const auth = {
   getUser() {
     const email = localStorage.getItem('godol_email');
@@ -27,6 +27,21 @@ export const auth = {
   logoutAdmin() {
     localStorage.removeItem('godol_admin_token');
     localStorage.removeItem('godol_admin_email');
+  },
+  getInstructor() {
+    const raw = localStorage.getItem('godol_instructor');
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  },
+  setInstructor(instructorData) {
+    localStorage.setItem('godol_instructor', JSON.stringify(instructorData));
+  },
+  logoutInstructor() {
+    localStorage.removeItem('godol_instructor');
   }
 };
 

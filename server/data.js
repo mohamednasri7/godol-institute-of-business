@@ -3,7 +3,7 @@ export const initialData = {
     // Homepage Content
     { key: "home_hero_title", value: "Shaping East Africa's Business Leaders", group: "homepage", label: "Homepage Hero Title" },
     { key: "home_hero_subtitle", value: "Godol Institute delivers world-class business education rooted in the realities of the Somali and East African market. Online courses, live workshops, and a network of professionals.", group: "homepage", label: "Homepage Hero Subtitle" },
-    { key: "home_badge_text", value: "Mogadishu, Somalia — Est. 2019", group: "homepage", label: "Homepage Hero Badge" },
+    { key: "home_badge_text", value: "Bosaso, Somalia — Est. 2019", group: "homepage", label: "Homepage Hero Badge" },
     { key: "announcement_banner", value: "New Executive Cohort Starting Next Month — Inquire on WhatsApp", group: "homepage", label: "Announcement Banner Text" },
 
     // About Page Content
@@ -22,9 +22,9 @@ export const initialData = {
     { key: "site_tagline", value: "Shaping East Africa's Business Leaders", group: "general", label: "Tagline" },
     { key: "enrollment_open", value: "true", group: "general", label: "Enrollment Open Status" },
     { key: "contact_email", value: "info@godolinstitute.so", group: "contact", label: "Contact Email" },
-    { key: "contact_phone", value: "+252 61 000 0000", group: "contact", label: "Contact Phone" },
-    { key: "contact_address", value: "Makka Al-Mukarama Road, Mogadishu, Somalia", group: "contact", label: "Campus Address" },
-    { key: "whatsapp_number", value: "252610000000", group: "contact", label: "WhatsApp Support" },
+    { key: "contact_phone", value: "+252 905139816", group: "contact", label: "Contact Phone" },
+    { key: "contact_address", value: "Bosaso, Somalia", group: "contact", label: "Campus Address" },
+    { key: "whatsapp_number", value: "252905139816", group: "contact", label: "WhatsApp Support" },
     { key: "facebook_url", value: "https://facebook.com/godolinstitute", group: "social", label: "Facebook" },
     { key: "linkedin_url", value: "https://linkedin.com/company/godolinstitute", group: "social", label: "LinkedIn" },
     { key: "twitter_url", value: "https://twitter.com/godolinstitute", group: "social", label: "Twitter / X" },
@@ -34,7 +34,7 @@ export const initialData = {
     { key: "evc_name", value: "Godol Institute of Business", group: "payment", label: "EVC Plus Account Name" },
     { key: "zaad_phone", value: "252630000000", group: "payment", label: "Zaad Number" },
     { key: "zaad_name", value: "Godol Institute of Business", group: "payment", label: "Zaad Account Name" },
-    { key: "sahal_phone", value: "252900000000", group: "payment", label: "Sahal Number" },
+    { key: "sahal_phone", value: "252905139816", group: "payment", label: "Sahal Number" },
     { key: "sahal_name", value: "Godol Institute of Business", group: "payment", label: "Sahal Account Name" },
     { key: "premier_merchant_id", value: "100294819", group: "payment", label: "Premier Wallet Merchant ID" },
     { key: "premier_name", value: "Godol Institute of Business", group: "payment", label: "Premier Wallet Name" },

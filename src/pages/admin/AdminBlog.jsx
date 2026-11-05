@@ -17,6 +17,7 @@ const defaultPost = {
 
 export default function AdminBlog() {
   const [posts, setPosts] = useState([]);
+  const [instructors, setInstructors] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState(defaultPost);
   const [editingId, setEditingId] = useState(null);
@@ -24,9 +25,13 @@ export default function AdminBlog() {
   const fetchPosts = () => {
     apiFetch('/api/admin/blog').then(setPosts).catch(console.error);
   };
+  const fetchInstructors = () => {
+    apiFetch('/api/admin/instructors').then(setInstructors).catch(() => {});
+  };
 
   useEffect(() => {
     fetchPosts();
+    fetchInstructors();
   }, []);
 
   const handleOpenAdd = () => {
@@ -157,14 +162,19 @@ export default function AdminBlog() {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold mb-1">Author</label>
-                  <input
-                    type="text"
-                    required
+                  <label className="block font-semibold mb-1">Author / Faculty</label>
+                  <select
                     value={formData.author}
                     onChange={(e) => setFormData({ ...formData, author: e.target.value })}
-                    className="w-full h-9 px-3 rounded-xl border border-gray-200 outline-none"
-                  />
+                    className="w-full h-9 px-3 rounded-xl border border-gray-200 outline-none bg-white"
+                  >
+                    <option value="Godol Editorial">Godol Editorial</option>
+                    {instructors.map(i => (
+                      <option key={i.id} value={i.name}>
+                        {i.name} ({i.title})
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>

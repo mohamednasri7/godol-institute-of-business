@@ -146,7 +146,7 @@ export default function About() {
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/20 bg-white/10 text-white/90 text-sm font-medium mb-6 backdrop-blur-sm">
             <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span>{settings.home_badge_text || 'Mogadishu, Somalia — Est. 2019'}</span>
+            <span>{settings.home_badge_text || 'Bosaso, Somalia — Est. 2019'}</span>
           </div>
           <h1 className="font-serif text-5xl md:text-7xl font-bold mb-6">
             {settings.about_hero_title || 'About Godol Institute'}
@@ -429,9 +429,9 @@ export default function About() {
                   {
                     icon: MapPin,
                     label: 'Address',
-                    value: 'Makka Al-Mukarama Road, Mogadishu, Somalia'
+                    value: 'Bosaso, Somalia'
                   },
-                  { icon: Phone, label: 'Phone', value: '+252 61 000 0000' },
+                  { icon: Phone, label: 'Phone', value: '+252 905139816' },
                   { icon: Mail, label: 'Email', value: 'info@godolinstitute.so' }
                 ].map(({ icon: Icon, label, value }) => (
                   <div key={label} className="flex items-start gap-4">
@@ -450,7 +450,7 @@ export default function About() {
 
               <div className="mt-8">
                 <a
-                  href="https://wa.me/252610000000"
+                  href="https://wa.me/252905139816"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm shadow-md transition-transform hover:scale-105"
@@ -470,7 +470,7 @@ export default function About() {
                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-6 text-center space-y-2">
                   <CheckCircle className="w-8 h-8 text-emerald-600 mx-auto" />
                   <p className="font-bold text-base">Message Sent Successfully!</p>
-                  <p className="text-xs text-emerald-700">Thank you for reaching out. Our admissions team in Mogadishu will review your enquiry and respond promptly.</p>
+                  <p className="text-xs text-emerald-700">Thank you for reaching out. Our admissions team in Bosaso will review your enquiry and respond promptly.</p>
                 </div>
               ) : (
                 <form className="space-y-4" onSubmit={handleContactSubmit}>

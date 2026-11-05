@@ -69,16 +69,16 @@ export default function Footer() {
               />
             </Link>
             <p className="text-white/60 mb-6 max-w-sm leading-relaxed text-sm">
-              Godol Institute of Business is Somalia's leading business education institution, empowering professionals and entrepreneurs across East Africa with practical, world-class training.
+              Godol Institute of Business is Somalia's leading business education institution, empowering professionals and entrepreneurs across East Africa with practical, world-class Business training.
             </p>
             <div className="flex flex-col gap-2.5 text-sm text-white/60 mb-8">
               <div className="flex items-center gap-2.5">
                 <MapPin className="w-4 h-4 text-white/40 flex-shrink-0" />
-                <span>Makka Al-Mukarama Road, Mogadishu, Somalia</span>
+                <span>Bosaso, Somalia</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Phone className="w-4 h-4 text-white/40 flex-shrink-0" />
-                <span>+252 61 000 0000</span>
+                <span>+252 905139816</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-white/40 flex-shrink-0" />

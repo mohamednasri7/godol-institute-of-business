@@ -17,7 +17,7 @@ const faqs = [
   },
   {
     q: 'Are classes online, in-person, or hybrid?',
-    a: 'We offer self-paced online video masterclasses accessible anywhere with internet, as well as intensive in-person executive workshops hosted at our Mogadishu campus.'
+    a: 'We offer self-paced online video masterclasses accessible anywhere with internet, as well as intensive in-person executive workshops hosted at our Bosaso campus.'
   },
   {
     q: 'Can corporate teams and organizations enroll employees?',
@@ -86,8 +86,7 @@ export default function Contact() {
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Campus Location</p>
-                      <p className="font-medium text-foreground">Makka Al-Mukarama Road</p>
-                      <p className="text-muted-foreground text-xs">Mogadishu, Somalia</p>
+                      <p className="font-medium text-foreground">Bosaso, Somalia</p>
                     </div>
                   </div>
 
@@ -97,8 +96,8 @@ export default function Contact() {
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-0.5">Telephone Support</p>
-                      <a href="tel:+252610000000" className="font-medium text-foreground hover:text-primary transition-colors">
-                        +252 61 000 0000
+                      <a href="tel:+252905139816" className="font-medium text-foreground hover:text-primary transition-colors">
+                        +252 905139816
                       </a>
                     </div>
                   </div>
@@ -129,7 +128,7 @@ export default function Contact() {
 
                 <div className="mt-8 pt-6 border-t border-border">
                   <a
-                    href="https://wa.me/252610000000?text=Hello%20Godol%20Institute%20Admissions,%20I%20would%20like%20to%20inquire%20about%20your%20programs."
+                    href="https://wa.me/252905139816?text=Hello%20Godol%20Institute%20Admissions,%20I%20would%20like%20to%20inquire%20about%20your%20programs."
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs text-center flex items-center justify-center gap-2 shadow-md transition-all"

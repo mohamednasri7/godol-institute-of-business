@@ -12,6 +12,7 @@ export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(auth.getUser());
   const [currentAdmin, setCurrentAdmin] = useState(auth.getAdmin());
+  const [currentInstructor, setCurrentInstructor] = useState(auth.getInstructor());
 
   const isHome = location === '/';
 
@@ -26,6 +27,7 @@ export default function Navbar() {
   useEffect(() => {
     setCurrentUser(auth.getUser());
     setCurrentAdmin(auth.getAdmin());
+    setCurrentInstructor(auth.getInstructor());
   }, [location]);
 
   const navLinks = [
@@ -96,6 +98,15 @@ export default function Navbar() {
                 className="inline-flex items-center justify-center rounded-full px-4 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 transition-all shadow-sm"
               >
                 Admin Panel
+              </Link>
+            )}
+
+            {currentInstructor && (
+              <Link
+                href="/instructor/dashboard"
+                className="inline-flex items-center justify-center rounded-full px-4 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-sm border border-slate-700"
+              >
+                Instructor Portal
               </Link>
             )}
 
@@ -193,6 +204,16 @@ export default function Navbar() {
           ))}
 
           <div className="h-px w-full bg-border my-2" />
+
+          {currentInstructor && (
+            <Link
+              href="/instructor/dashboard"
+              className="w-full text-center py-2.5 rounded-full bg-slate-900 text-white font-semibold text-sm mb-2"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Instructor Portal
+            </Link>
+          )}
 
           {hasClerk ? (
             <>
