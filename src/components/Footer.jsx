@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'wouter';
 import { MapPin, Phone, Mail, ArrowRight, Facebook, Twitter, Linkedin, Instagram, CheckCircle } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import ThemeToggleSwitch from './ThemeToggleSwitch';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -190,7 +191,11 @@ export default function Footer() {
           <p>
             © {currentYear} Godol Institute of Business. All rights reserved. Bosaso, Somalia.
           </p>
-          <div className="flex gap-6">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-white/50">Night Mode:</span>
+              <ThemeToggleSwitch isTransparent={true} />
+            </div>
             <Link href="/privacy" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition-colors">
               Privacy Policy
             </Link>

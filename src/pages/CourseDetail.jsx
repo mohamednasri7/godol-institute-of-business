@@ -208,7 +208,7 @@ export default function CourseDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-background text-foreground pb-24">
       {/* Course Header Banner */}
       <div className="bg-[hsl(215,72%,18%)] pt-32 pb-16 text-white relative">
         <div className="container mx-auto px-4 md:px-6">

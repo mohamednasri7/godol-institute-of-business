@@ -127,7 +127,7 @@ export default function Checkout() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -140,28 +140,28 @@ export default function Checkout() {
 
   if (step === 'success') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-xl p-8 max-w-md w-full text-center">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+        <div className="bg-card border border-border rounded-3xl shadow-xl p-8 max-w-md w-full text-center">
           <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-emerald-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Payment Submitted!</h1>
-          <p className="text-gray-500 text-sm mb-6">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Payment Submitted!</h1>
+          <p className="text-muted-foreground text-sm mb-6">
             Your payment details have been received. Our team will verify your transaction and grant you course access — typically within a few hours.
           </p>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
-            <p className="text-xs font-semibold text-amber-800 mb-1">What happens next?</p>
-            <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6 text-left">
+            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1">What happens next?</p>
+            <ul className="text-xs text-amber-700 dark:text-amber-300 space-y-1 list-disc list-inside">
               <li>Admin reviews your submitted reference</li>
               <li>Payment is verified via mobile money records</li>
               <li>Course access is granted automatically</li>
               <li>You'll see the course in your dashboard</li>
             </ul>
           </div>
-          <Link href="/dashboard" className="w-full py-3 rounded-xl bg-primary text-white font-bold text-sm block text-center hover:bg-primary/90 transition-colors">
+          <Link href="/dashboard" className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm block text-center hover:bg-primary/90 transition-colors">
             Go to My Dashboard
           </Link>
-          <Link href="/courses" className="mt-3 text-xs text-gray-400 hover:text-gray-600 block">
+          <Link href="/courses" className="mt-3 text-xs text-muted-foreground hover:text-foreground block">
             Browse more courses
           </Link>
         </div>
@@ -170,7 +170,7 @@ export default function Checkout() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
+    <div className="min-h-screen bg-background text-foreground py-10 px-4">
       <div className="max-w-2xl mx-auto">
         {/* Back link */}
         <Link href={`/courses/${enrollment.courseId}`} className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-6">

@@ -99,7 +99,7 @@ export default function Dashboard() {
     : currentUser.email[0].toUpperCase();
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-background text-foreground pb-20">
       {/* Student Profile Banner */}
       <div className="bg-[hsl(215,72%,18%)] pt-28 pb-8 text-white">
         <div className="container mx-auto px-4 md:px-6">

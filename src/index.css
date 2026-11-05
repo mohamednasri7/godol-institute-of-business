@@ -28,26 +28,26 @@
 }
 
 .dark {
-  --background: 222 47% 9%;
+  --background: 224 71% 4%;
   --foreground: 210 40% 98%;
-  --card: 222 47% 13%;
+  --card: 222 47% 8%;
   --card-foreground: 210 40% 98%;
-  --card-border: 217 33% 20%;
-  --popover: 222 47% 13%;
+  --card-border: 217 33% 15%;
+  --popover: 222 47% 8%;
   --popover-foreground: 210 40% 98%;
-  --popover-border: 217 33% 20%;
+  --popover-border: 217 33% 15%;
   --primary: 217 91% 60%;
-  --primary-foreground: 222 47% 11%;
-  --secondary: 217 33% 18%;
+  --primary-foreground: 224 71% 4%;
+  --secondary: 217 33% 14%;
   --secondary-foreground: 210 40% 98%;
-  --muted: 217 33% 16%;
-  --muted-foreground: 215 20% 68%;
+  --muted: 217 33% 12%;
+  --muted-foreground: 215 20% 70%;
   --accent: 42 92% 52%;
   --accent-foreground: 215 50% 12%;
   --destructive: 0 62% 40%;
   --destructive-foreground: 0 0% 98%;
-  --border: 217 33% 20%;
-  --input: 217 33% 20%;
+  --border: 217 33% 16%;
+  --input: 217 33% 16%;
   --ring: 217 91% 60%;
 }
 
@@ -59,43 +59,84 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Dark mode scrollbars */
-.dark ::-webkit-scrollbar-track {
-  background: #0f172a;
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+/* Full dark mode body enforcement */
+.dark,
+.dark body {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
 }
 
-/* Automatic surface mappings for dark mode */
+/* Dark mode scrollbars */
+.dark ::-webkit-scrollbar-track {
+  background: #020617;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Automatic surface mappings for full dark mode */
 .dark .bg-white:not([class*="bg-white/"]):not(.keep-light) {
   background-color: hsl(var(--card)) !important;
   color: hsl(var(--card-foreground));
 }
 
-.dark .bg-gray-50:not([class*="bg-gray-50/"]) {
+.dark .bg-gray-50:not([class*="bg-gray-50/"]),
+.dark .bg-slate-50:not([class*="bg-slate-50/"]) {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground));
+}
+
+.dark .bg-gray-100:not([class*="bg-gray-100/"]):not(.keep-light),
+.dark .bg-slate-100:not([class*="bg-slate-100/"]):not(.keep-light),
+.dark .bg-muted\/20,
+.dark .bg-muted\/30,
+.dark .bg-muted\/40,
+.dark .bg-muted\/50 {
   background-color: hsl(var(--muted)) !important;
 }
 
-.dark .border-gray-200:not([class*="border-gray-200/"]),
-.dark .border-gray-100:not([class*="border-gray-100/"]),
-.dark .border-slate-200:not([class*="border-slate-200/"]) {
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-300 {
   border-color: hsl(var(--border)) !important;
 }
 
 .dark .text-gray-900:not(.keep-light),
-.dark .text-slate-900:not(.keep-light) {
+.dark .text-gray-800:not(.keep-light),
+.dark .text-slate-900:not(.keep-light),
+.dark .text-slate-800:not(.keep-light) {
   color: hsl(var(--foreground)) !important;
 }
 
+.dark .text-gray-700:not(.keep-light),
 .dark .text-gray-600:not(.keep-light),
 .dark .text-gray-500:not(.keep-light),
+.dark .text-slate-700:not(.keep-light),
 .dark .text-slate-600:not(.keep-light),
 .dark .text-slate-500:not(.keep-light) {
   color: hsl(var(--muted-foreground)) !important;
+}
+
+.dark input:not([type="checkbox"]):not([type="radio"]):not([class*="bg-white/"]):not([class*="bg-slate-900"]),
+.dark textarea:not([class*="bg-white/"]):not([class*="bg-slate-900"]),
+.dark select {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--foreground)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+
+.dark table thead {
+  background-color: hsl(var(--muted)) !important;
+}
+
+.dark tr:hover {
+  background-color: hsl(var(--muted) / 0.5) !important;
 }
 
 .hero-gradient {

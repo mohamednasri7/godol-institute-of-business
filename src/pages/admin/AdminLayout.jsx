@@ -10,6 +10,7 @@ import {
 import { auth } from '../../lib/auth';
 import { apiFetch } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
+import ThemeToggleSwitch from '../../components/ThemeToggleSwitch';
 
 const adminNav = [
   { label: 'Overview', items: [
@@ -68,7 +69,7 @@ export default function AdminLayout({ children, title, subtitle }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-background text-foreground flex">
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[hsl(215,72%,14%)] text-white flex flex-col transform transition-transform duration-200 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 lg:flex`}>
         {/* Brand */}
@@ -151,15 +152,7 @@ export default function AdminLayout({ children, title, subtitle }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to night mode'}
-              title={isDark ? 'Switch to light mode' : 'Switch to night mode'}
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center justify-center border border-border"
-            >
-              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
-            </button>
+            <ThemeToggleSwitch />
             {pendingCount > 0 && (
               <Link href="/admin/payments"
                 className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors">

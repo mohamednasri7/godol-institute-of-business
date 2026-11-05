@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { auth } from '../../lib/auth';
 import { apiFetch } from '../../lib/api';
+import ThemeToggleSwitch from '../../components/ThemeToggleSwitch';
 
 export default function InstructorDashboard() {
   const [, setLocation] = useLocation();
@@ -189,7 +190,7 @@ export default function InstructorDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
+    <div className="min-h-screen bg-background text-foreground pb-20">
       {/* Top Banner */}
       <div className="bg-[hsl(215,72%,18%)] pt-28 pb-10 text-white shadow-md">
         <div className="container mx-auto px-4 md:px-6">
@@ -213,6 +214,7 @@ export default function InstructorDashboard() {
             </div>
 
             <div className="flex items-center gap-3">
+              <ThemeToggleSwitch isTransparent={true} />
               <Link
                 href={`/instructors/${instructor.id}`}
                 target="_blank"
