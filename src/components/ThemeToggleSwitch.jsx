@@ -44,3 +44,4 @@ export default function ThemeToggleSwitch({ className = '', isTransparent = fals
     </button>
   );
 }
+

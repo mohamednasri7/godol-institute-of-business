@@ -8,10 +8,10 @@ import { SignUp } from '@clerk/clerk-react';
 const hasClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 const benefits = [
-  'Access 40+ business courses taught by industry experts',
-  'Attend live workshops in Bosaso',
-  'Earn certificates recognised across East Africa',
-  'Join a network of 500+ business professionals',
+  'Practical business courses taught by experienced industry practitioners',
+  'Attend live executive workshops in Bosaso',
+  'Earn accredited certificates recognised across East Africa',
+  'Direct mentorship and network of emerging Somali entrepreneurs',
   'Learn in Somali and English'
 ];
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Eye, EyeOff, BookOpen, CheckCircle, Users, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Laptop, Target, Users, ArrowRight } from 'lucide-react';
 import { auth } from '../lib/auth';
 import { SignIn } from '@clerk/clerk-react';
 
@@ -74,32 +74,44 @@ export default function Login() {
 
         <div className="relative z-10 max-w-md">
           <h2 className="font-serif text-4xl font-bold text-white mb-4 leading-tight">
-            Welcome back to your learning journey
+            Welcome to your learning journey
           </h2>
           <p className="text-white/70 text-lg mb-12">
-            Continue building the skills that drive business success across East Africa.
+            Practical business education tailored for ambitious leaders across East Africa.
           </p>
 
           <div className="space-y-4">
             {[
-              { icon: BookOpen, stat: '40+', label: 'Business Courses' },
-              { icon: CheckCircle, stat: '500+', label: 'Graduates' },
-              { icon: Users, stat: '20+', label: 'Expert Instructors' }
-            ].map(({ icon: Icon, stat, label }) => (
+              {
+                icon: Laptop,
+                title: 'Flexible Online Learning',
+                desc: 'Self-paced modules with live interactive workshops'
+              },
+              {
+                icon: Target,
+                title: 'Practical, Market-Driven Skills',
+                desc: 'Curriculum built for immediate real-world impact'
+              },
+              {
+                icon: Users,
+                title: 'Direct Mentorship',
+                desc: 'Guided feedback from experienced business professionals'
+              }
+            ].map(({ icon: Icon, title, desc }) => (
               <div
-                key={label}
-                className="flex items-center gap-4 p-3.5 rounded-xl border border-white/10"
+                key={title}
+                className="flex items-start gap-4 p-4 rounded-2xl border border-white/10 backdrop-blur-md shadow-sm transition-all hover:border-white/20"
                 style={{ background: 'rgba(255,255,255,0.07)' }}
               >
                 <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
                   style={{ background: 'hsl(42 92% 52% / 0.2)' }}
                 >
                   <Icon className="w-5 h-5 text-accent" />
                 </div>
                 <div>
-                  <div className="text-white font-bold text-lg leading-none">{stat}</div>
-                  <div className="text-white/50 text-xs mt-0.5">{label}</div>
+                  <div className="text-white font-bold text-sm leading-snug">{title}</div>
+                  <div className="text-white/60 text-xs mt-1 leading-relaxed">{desc}</div>
                 </div>
               </div>
             ))}
