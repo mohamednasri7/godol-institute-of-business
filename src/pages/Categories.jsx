@@ -111,7 +111,7 @@ export default function Categories() {
                 In-Person Cohorts
               </div>
               <h2 className="font-serif text-3xl md:text-4xl font-bold mb-2 text-foreground">
-                Live Mogadishu Workshops
+                Live Bosaso Workshops
               </h2>
               <p className="text-muted-foreground">
                 Join experienced founders and executives for intensive, hands-on weekend workshops.
@@ -160,7 +160,7 @@ export default function Categories() {
                     </div>
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-primary" />
-                      <span>{w.location || 'Mogadishu Campus'}</span>
+                      <span>{w.location || 'Bosaso Campus'}</span>
                     </div>
                   </div>
 

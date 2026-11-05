@@ -68,7 +68,7 @@ export default function Terms() {
           <div>
             <h2 className="font-serif text-2xl font-bold text-foreground mb-3">6. Governing Law & Jurisdiction</h2>
             <p>
-              These Terms shall be governed and interpreted in accordance with the commercial and civil laws of Somalia. Any disputes arising in connection with these terms shall be subject to the jurisdiction of the competent courts in Mogadishu.
+              These Terms shall be governed and interpreted in accordance with the commercial and civil laws of Somalia. Any disputes arising in connection with these terms shall be subject to the jurisdiction of the competent courts in Bosaso, Somalia.
             </p>
           </div>
         </div>

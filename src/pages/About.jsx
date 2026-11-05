@@ -42,14 +42,10 @@ const coreValues = [
 ];
 
 const timeline = [
-  { year: '2019', event: 'Godol Institute founded in Mogadishu with 3 courses and 40 students' },
-  { year: '2020', event: 'Launched online learning platform — expanded reach to the diaspora' },
-  { year: '2021', event: 'Introduced live workshops in Mogadishu; graduated first cohort of 80 students' },
-  { year: '2022', event: 'Partnered with three East African universities for credit recognition' },
-  { year: '2023', event: 'Expanded to 30+ courses across 8 business disciplines' },
-  { year: '2024', event: 'Surpassed 500 graduates; opened a second Mogadishu campus location' },
-  { year: '2025', event: 'Launched scholarship program for women in business' },
-  { year: '2026', event: 'Introducing MBA-equivalent Executive Program for senior leaders' }
+  { year: 'June 2025', event: 'Godol Institute founded in Bosaso with core business courses and professional cohorts' },
+  { year: 'Late 2025', event: 'Launched online learning platform — expanding practical business education across East Africa' },
+  { year: 'Early 2026', event: 'Introduced executive live workshops in Bosaso; expanded faculty of industry practitioners' },
+  { year: '2026', event: 'Introducing MBA-equivalent Executive Programs for emerging Somali entrepreneurs' }
 ];
 
 
@@ -146,7 +142,7 @@ export default function About() {
         <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/20 bg-white/10 text-white/90 text-sm font-medium mb-6 backdrop-blur-sm">
             <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span>{settings.home_badge_text || 'Bosaso, Somalia — Est. 2019'}</span>
+            <span>{settings.home_badge_text || 'Bosaso, Somalia — Est. 2025'}</span>
           </div>
           <h1 className="font-serif text-5xl md:text-7xl font-bold mb-6">
             {settings.about_hero_title || 'About Godol Institute'}
@@ -172,7 +168,7 @@ export default function About() {
                 {settings.about_mission_title || 'Business education built for East Africa, by East Africa'}
               </h2>
               <p className="text-muted-foreground text-base md:text-lg leading-relaxed mb-6">
-                {settings.about_mission_text || 'Godol Institute was founded in 2019 on a simple but powerful belief: Somalia and East Africa deserve world-class business education that understands their unique context, challenges, and opportunities.'}
+                {settings.about_mission_text || 'Godol Institute was founded in June 2025 on a simple but powerful belief: Somalia and East Africa deserve world-class business education that understands their unique context, challenges, and opportunities.'}
               </p>
               <p className="text-muted-foreground text-base md:text-lg leading-relaxed mb-8">
                 {settings.about_mission_text_secondary || 'Too much business education imported from the West fails to account for our markets, our legal environments, our financing realities, and our cultural business practices. We built Godol to fix that.'}
@@ -251,7 +247,7 @@ export default function About() {
           <div className="text-center max-w-xl mx-auto mb-14">
             <h2 className="font-serif text-4xl font-bold mb-4 text-foreground">Our Story</h2>
             <p className="text-muted-foreground text-lg">
-              From a small classroom in Mogadishu to East Africa's leading business institute.
+              From our founding campus in Bosaso to East Africa's leading business institute.
             </p>
           </div>
 

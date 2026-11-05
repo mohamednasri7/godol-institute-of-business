@@ -13,7 +13,7 @@ export default function Privacy() {
           </div>
           <h1 className="font-serif text-4xl md:text-5xl font-bold mb-3">Privacy Policy</h1>
           <p className="text-white/70 text-sm max-w-xl mx-auto">
-            Effective Date: January 1, 2026 • Godol Institute of Business, Mogadishu, Somalia
+            Effective Date: January 1, 2026 • Godol Institute of Business, Bosaso, Somalia
           </p>
         </div>
       </section>
@@ -27,7 +27,7 @@ export default function Privacy() {
           <div>
             <h2 className="font-serif text-2xl font-bold text-foreground mb-3">1. Introduction</h2>
             <p>
-              Godol Institute of Business ("Godol Institute", "we", "our", or "the Institute") is committed to protecting the privacy, confidentiality, and data sovereignty of all students, faculty members, workshop attendees, and portal visitors. This Privacy Policy details how we collect, process, and protect your information when utilizing our educational platform, courses, mobile money verification workflows, and campus facilities in Mogadishu, Somalia.
+              Godol Institute of Business ("Godol Institute", "we", "our", or "the Institute") is committed to protecting the privacy, confidentiality, and data sovereignty of all students, faculty members, workshop attendees, and portal visitors. This Privacy Policy details how we collect, process, and protect your information when utilizing our educational platform, courses, mobile money verification workflows, and campus facilities in Bosaso, Somalia.
             </p>
           </div>
 

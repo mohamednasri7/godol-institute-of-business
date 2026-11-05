@@ -7,7 +7,7 @@ const defaultWorkshop = {
   title: '',
   slug: '',
   description: '',
-  location: 'Mogadishu, Somalia',
+  location: 'Bosaso, Somalia',
   date: 'July 25–26, 2026',
   durationHours: '16 Hours / 2 Days',
   capacity: 30,
@@ -71,7 +71,7 @@ export default function AdminWorkshops() {
 
   return (
     <AdminLayout
-      title="Live Mogadishu Workshops"
+      title="Live Bosaso Workshops"
       subtitle="Manage in-person cohorts, dates, and seat availability"
     >
       <div className="space-y-6">

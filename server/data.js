@@ -3,14 +3,14 @@ export const initialData = {
     // Homepage Content
     { key: "home_hero_title", value: "Shaping East Africa's Business Leaders", group: "homepage", label: "Homepage Hero Title" },
     { key: "home_hero_subtitle", value: "Godol Institute delivers world-class business education rooted in the realities of the Somali and East African market. Online courses, live workshops, and a network of professionals.", group: "homepage", label: "Homepage Hero Subtitle" },
-    { key: "home_badge_text", value: "Bosaso, Somalia — Est. 2019", group: "homepage", label: "Homepage Hero Badge" },
+    { key: "home_badge_text", value: "Bosaso, Somalia — Est. 2025", group: "homepage", label: "Homepage Hero Badge" },
     { key: "announcement_banner", value: "New Executive Cohort Starting Next Month — Inquire on WhatsApp", group: "homepage", label: "Announcement Banner Text" },
 
     // About Page Content
     { key: "about_hero_title", value: "About Godol Institute", group: "about", label: "About Page Main Title" },
     { key: "about_hero_subtitle", value: "Somalia's premier business education institution — built to empower a new generation of East African business leaders.", group: "about", label: "About Hero Subtitle" },
     { key: "about_mission_title", value: "Business education built for East Africa, by East Africa", group: "about", label: "Mission Section Heading" },
-    { key: "about_mission_text", value: "Godol Institute was founded in 2019 on a simple but powerful belief: Somalia and East Africa deserve world-class business education that understands their unique context, challenges, and opportunities.", group: "about", label: "Mission Statement (Primary Paragraph)" },
+    { key: "about_mission_text", value: "Godol Institute was founded in June 2025 on a simple but powerful belief: Somalia and East Africa deserve world-class business education that understands their unique context, challenges, and opportunities.", group: "about", label: "Mission Statement (Primary Paragraph)" },
     { key: "about_mission_text_secondary", value: "Too much business education imported from the West fails to account for our markets, our legal environments, our financing realities, and our cultural business practices. We built Godol to fix that.", group: "about", label: "Mission Statement (Secondary Paragraph)" },
     { key: "about_director_name", value: "Dr. Mohamed Godol", group: "about", label: "Founder / Academic Director Name" },
     { key: "about_director_title", value: "Founder & Academic Director", group: "about", label: "Director Title" },

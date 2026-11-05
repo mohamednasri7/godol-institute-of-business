@@ -788,7 +788,7 @@ export function createApiRouter() {
       issueDate: cert.issueDate || new Date().toISOString().split('T')[0],
       status: cert.status || 'issued',
       institution: 'Godol Institute of Business',
-      accreditation: 'Mogadishu & East Africa Enterprise Registry'
+      accreditation: 'Bosaso & East Africa Enterprise Registry'
     });
   });
 

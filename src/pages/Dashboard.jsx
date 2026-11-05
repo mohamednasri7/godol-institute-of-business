@@ -406,7 +406,7 @@ export default function Dashboard() {
                 >
                   <div>
                     <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-accent/20 text-accent-foreground mb-3 inline-block">
-                      {w.tag || 'Mogadishu Cohort'}
+                      {w.tag || 'Bosaso Cohort'}
                     </span>
                     <h4 className="font-bold text-base text-foreground mb-2">{w.title}</h4>
                     <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
@@ -421,7 +421,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-primary" />
-                      <span>{w.location || 'Mogadishu, Somalia'}</span>
+                      <span>{w.location || 'Bosaso, Somalia'}</span>
                     </div>
                   </div>
                 </div>
@@ -470,7 +470,7 @@ export default function Dashboard() {
               <div className="pt-6 mt-6 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
                 <div>
                   <p className="font-semibold text-foreground">Date: {activeCert.issueDate}</p>
-                  <p>Mogadishu, Somalia</p>
+                  <p>Bosaso, Somalia</p>
                 </div>
                 <div>
                   <p className="font-mono font-semibold text-foreground">

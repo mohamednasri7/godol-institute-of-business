@@ -76,7 +76,7 @@ export default function Home() {
     {
       icon: Calendar,
       title: 'Live Workshops',
-      desc: 'Intensive in-person sessions in Mogadishu led by industry practitioners for hands-on, real-world learning.'
+      desc: 'Intensive in-person sessions in Bosaso led by industry practitioners for hands-on, real-world learning.'
     }
   ];
 
@@ -143,7 +143,7 @@ export default function Home() {
             {/* Tag badge */}
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/20 bg-white/10 text-white/90 text-sm font-medium mb-8 backdrop-blur-sm">
               <Sparkles className="w-3.5 h-3.5 text-accent" />
-              <span>{settings.home_badge_text || 'Mogadishu, Somalia — Est. 2019'}</span>
+              <span>{settings.home_badge_text || 'Bosaso, Somalia — Est. 2025'}</span>
             </div>
 
             {/* Main Headline */}
@@ -331,7 +331,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Live in Mogadishu Workshops Section */}
+      {/* Live in Bosaso Workshops Section */}
       <section className="py-24 bg-background">
         <div className="container mx-auto px-4 md:px-6">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
@@ -340,7 +340,7 @@ export default function Home() {
                 className="inline-block px-3.5 py-1 rounded-full text-xs font-semibold tracking-widest uppercase mb-4"
                 style={{ background: 'hsl(42 92% 52% / 0.15)', color: 'hsl(42 92% 40%)' }}
               >
-                Live in Mogadishu
+                Live in Bosaso
               </div>
               <h2 className="font-serif text-4xl font-bold mb-2 text-foreground">
                 Upcoming Workshops
@@ -408,7 +408,7 @@ export default function Home() {
               <Calendar className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
               <h3 className="font-bold text-base text-foreground mb-1">No Live Workshops Scheduled Yet</h3>
               <p className="text-xs text-muted-foreground">
-                Upcoming executive cohorts and in-person sessions in Mogadishu will be announced here soon.
+                Upcoming executive cohorts and in-person sessions in Bosaso will be announced here soon.
               </p>
             </div>
           )}

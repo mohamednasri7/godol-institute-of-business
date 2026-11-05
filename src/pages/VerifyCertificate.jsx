@@ -177,7 +177,7 @@ export default function VerifyCertificate() {
               <div className="bg-muted/30 rounded-2xl p-4 flex items-center justify-between text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Building className="w-4 h-4 text-primary" />
-                  <span>Permanent registry record maintained in Mogadishu, Somalia</span>
+                  <span>Permanent registry record maintained in Bosaso, Somalia</span>
                 </div>
                 <span className="text-emerald-600 font-bold">Status: Active</span>
               </div>

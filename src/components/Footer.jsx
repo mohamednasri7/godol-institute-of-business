@@ -188,7 +188,7 @@ export default function Footer() {
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-white/40">
           <p>
-            © {currentYear} Godol Institute of Business. All rights reserved. Mogadishu, Somalia.
+            © {currentYear} Godol Institute of Business. All rights reserved. Bosaso, Somalia.
           </p>
           <div className="flex gap-6">
             <Link href="/privacy" onClick={() => window.scrollTo(0, 0)} className="hover:text-white transition-colors">

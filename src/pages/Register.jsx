@@ -9,7 +9,7 @@ const hasClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 const benefits = [
   'Access 40+ business courses taught by industry experts',
-  'Attend live workshops in Mogadishu',
+  'Attend live workshops in Bosaso',
   'Earn certificates recognised across East Africa',
   'Join a network of 500+ business professionals',
   'Learn in Somali and English'
