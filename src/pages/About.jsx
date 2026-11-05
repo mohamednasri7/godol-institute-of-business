@@ -320,8 +320,8 @@ export default function About() {
           <div className="container mx-auto px-4 md:px-6">
             <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center gap-10">
               <img
-                src={settings.about_director_image || '/instructor-1.png'}
-                alt={settings.about_director_name || 'Academic Director'}
+                src={settings.about_director_image || '/founder-mohammed-nasri.jpg'}
+                alt={settings.about_director_name || 'Eng. Mohammed Nasri'}
                 className="w-36 h-36 md:w-44 md:h-44 rounded-3xl object-cover border-4 border-primary/20 shadow-xl flex-shrink-0"
               />
               <div className="space-y-4 text-center md:text-left">
@@ -335,11 +335,11 @@ export default function About() {
                   Message from the Academic Director
                 </h3>
                 <blockquote className="text-muted-foreground text-base md:text-lg italic leading-relaxed">
-                  "{settings.about_director_message || 'At Godol Institute, we do not teach abstract business theories from other continents. We teach practical frameworks tested in local markets, financing realities, and fast-growing regional economies.'}"
+                  "{settings.about_director_message || 'Real business success needs real-world experience, not just textbooks. At Godol Institute, we teach strategies that fit the actual challenges and opportunities of our region.'}"
                 </blockquote>
                 <div>
                   <p className="font-bold text-foreground text-base">
-                    {settings.about_director_name || 'Dr. Mohamed Godol'}
+                    {settings.about_director_name || 'Eng. Mohammed Nasri'}
                   </p>
                   <p className="text-xs text-primary font-semibold">
                     {settings.about_director_title || 'Founder & Academic Director'}

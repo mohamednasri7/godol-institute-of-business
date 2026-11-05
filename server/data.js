@@ -12,10 +12,10 @@ export const initialData = {
     { key: "about_mission_title", value: "Business education built for East Africa, by East Africa", group: "about", label: "Mission Section Heading" },
     { key: "about_mission_text", value: "Godol Institute was founded in June 2025 on a simple but powerful belief: Somalia and East Africa deserve world-class business education that understands their unique context, challenges, and opportunities.", group: "about", label: "Mission Statement (Primary Paragraph)" },
     { key: "about_mission_text_secondary", value: "Too much business education imported from the West fails to account for our markets, our legal environments, our financing realities, and our cultural business practices. We built Godol to fix that.", group: "about", label: "Mission Statement (Secondary Paragraph)" },
-    { key: "about_director_name", value: "Dr. Mohamed Godol", group: "about", label: "Founder / Academic Director Name" },
+    { key: "about_director_name", value: "Eng. Mohammed Nasri", group: "about", label: "Founder / Academic Director Name" },
     { key: "about_director_title", value: "Founder & Academic Director", group: "about", label: "Director Title" },
-    { key: "about_director_message", value: "At Godol Institute, we don't teach abstract theories from other continents. We teach practical frameworks tested in local markets, financing realities, and fast-growing regional economies.", group: "about", label: "Director's Official Welcome Quote" },
-    { key: "about_director_image", value: "/instructor-1.png", group: "about", label: "Director Portrait Photo URL or Image" },
+    { key: "about_director_message", value: "Real business success needs real-world experience, not just textbooks. At Godol Institute, we teach strategies that fit the actual challenges and opportunities of our region.", group: "about", label: "Director's Official Welcome Quote" },
+    { key: "about_director_image", value: "/founder-mohammed-nasri.jpg", group: "about", label: "Director Portrait Photo URL or Image" },
 
     // General & Branding
     { key: "site_name", value: "Godol Institute of Business", group: "general", label: "Institution Name" },
