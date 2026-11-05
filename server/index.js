@@ -10,10 +10,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DB_PATH = path.join(__dirname, 'db.json');
 
+let memoryDB = null;
+
 function loadDB() {
+  if (memoryDB) return memoryDB;
   if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2), 'utf8');
-    return JSON.parse(JSON.stringify(initialData));
+    try {
+      fs.writeFileSync(DB_PATH, JSON.stringify(initialData, null, 2), 'utf8');
+    } catch {
+      // Read-only serverless environment
+    }
+    memoryDB = JSON.parse(JSON.stringify(initialData));
+    return memoryDB;
   }
   try {
     const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
@@ -24,9 +32,11 @@ function loadDB() {
     if (!data.enquiries) data.enquiries = [];
     if (!data.newsletter_subscribers) data.newsletter_subscribers = [];
     if (!data.instructor_applications) data.instructor_applications = [];
+    memoryDB = data;
     return data;
   } catch (err) {
-    return JSON.parse(JSON.stringify(initialData));
+    memoryDB = JSON.parse(JSON.stringify(initialData));
+    return memoryDB;
   }
 }
 
@@ -164,7 +174,12 @@ export async function pullFromSupabase() {
         totalInstructors: db.instructors?.length || 0,
         avgRating: 5.0
       };
-      fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf8');
+      memoryDB = db;
+      try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf8');
+      } catch {
+        // Ignored on serverless
+      }
       lastSyncTime = Date.now();
     }
     return true;
@@ -225,7 +240,13 @@ function saveDB(data) {
     });
   }
 
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
+  memoryDB = data;
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
+  } catch (fsErr) {
+    // Read-only filesystem in serverless environments (Vercel)
+    console.warn('Local file write skipped (serverless environment):', fsErr.message);
+  }
 
   // If Supabase is configured, sync every table in background
   if (isSupabaseConfigured && supabase) {

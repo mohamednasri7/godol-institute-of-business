@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Switch, Route, useLocation } from 'wouter';
+import { Switch, Route, Redirect, useLocation } from 'wouter';
 import Layout from './components/Layout';
 import ChatWidget from './components/ChatWidget';
 import ClerkAuthSync from './components/ClerkAuthSync';
@@ -82,6 +82,21 @@ export default function App() {
         {/* Public Routes */}
         <Route path="/">
           <Layout><Home /></Layout>
+        </Route>
+        <Route path="/programs">
+          <Redirect to="/courses" />
+        </Route>
+        <Route path="/admissions">
+          <Redirect to="/contact" />
+        </Route>
+        <Route path="/workshops">
+          <Redirect to="/categories" />
+        </Route>
+        <Route path="/faculty">
+          <Redirect to="/instructors" />
+        </Route>
+        <Route path="/apply">
+          <Redirect to="/instructors" />
         </Route>
         <Route path="/courses">
           <Layout><Courses /></Layout>
