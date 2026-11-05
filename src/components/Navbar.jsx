@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Sun, Moon } from 'lucide-react';
 import { auth } from '../lib/auth';
 import { SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
+import { useTheme } from '../context/ThemeContext';
 
 const hasClerk = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 export default function Navbar() {
+  const { theme, isDark, toggleTheme } = useTheme();
   const [location] = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -47,7 +49,7 @@ export default function Navbar() {
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isTransparent
           ? 'bg-transparent py-5'
-          : 'bg-white/95 backdrop-blur-md border-b border-border shadow-sm py-3'
+          : 'bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-border shadow-sm py-3'
       }`}
     >
       <div className="container mx-auto px-4 md:px-6 flex items-center justify-between">
@@ -56,7 +58,7 @@ export default function Navbar() {
             src="/godol-logo.png"
             alt="Godol Institute of Business"
             className={`h-12 w-auto object-contain transition-all duration-300 ${
-              isTransparent ? 'brightness-0 invert' : ''
+              isTransparent ? 'brightness-0 invert' : 'dark:brightness-0 dark:invert'
             }`}
           />
         </Link>
@@ -90,6 +92,24 @@ export default function Navbar() {
           </ul>
 
           <div className={`h-5 w-px ${isTransparent ? 'bg-white/20' : 'bg-border'}`} />
+
+          {/* Night Mode Toggle */}
+          <button
+            onClick={toggleTheme}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to night mode'}
+            title={isDark ? 'Switch to light mode' : 'Switch to night mode'}
+            className={`p-2 rounded-full transition-all duration-200 flex items-center justify-center ${
+              isTransparent
+                ? 'text-white/80 hover:text-white hover:bg-white/10'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+            }`}
+          >
+            {isDark ? (
+              <Sun className="w-4 h-4 text-amber-400 transition-transform rotate-0 hover:rotate-90 duration-300" />
+            ) : (
+              <Moon className="w-4 h-4 text-foreground/80 transition-transform hover:-rotate-12 duration-300" />
+            )}
+          </button>
 
           <div className="flex items-center gap-3">
             {currentAdmin && (
@@ -170,21 +190,49 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Mobile Hamburger Button */}
-        <button
-          className={`lg:hidden p-2 -mr-2 transition-colors ${
-            isTransparent ? 'text-white' : 'text-foreground'
-          }`}
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          aria-label="Toggle menu"
-        >
-          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
+        {/* Mobile Action Controls */}
+        <div className="lg:hidden flex items-center gap-1.5">
+          <button
+            onClick={toggleTheme}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to night mode'}
+            className={`p-2 rounded-full transition-colors ${
+              isTransparent ? 'text-white hover:bg-white/10' : 'text-foreground hover:bg-muted'
+            }`}
+          >
+            {isDark ? <Sun className="h-5 w-5 text-amber-400" /> : <Moon className="h-5 w-5 text-foreground/80" />}
+          </button>
+          <button
+            className={`p-2 -mr-2 transition-colors ${
+              isTransparent ? 'text-white' : 'text-foreground'
+            }`}
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu Dropdown */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-b border-border shadow-xl py-5 px-6 flex flex-col gap-2">
+        <div className="lg:hidden absolute top-full left-0 right-0 bg-white dark:bg-slate-900 border-b border-border shadow-xl py-5 px-6 flex flex-col gap-2">
+          {/* Night Mode Switch in Drawer */}
+          <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-muted/40 mb-1">
+            <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+              {isDark ? <Moon className="w-4 h-4 text-amber-400" /> : <Sun className="w-4 h-4 text-amber-500" />}
+              <span>Night Mode</span>
+            </span>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ${
+                isDark ? 'bg-primary justify-end' : 'bg-muted-foreground/30 justify-start'
+              }`}
+              aria-label="Toggle Night Mode"
+            >
+              <div className="w-4 h-4 rounded-full bg-white shadow-md" />
+            </button>
+          </div>
           {navLinks.map((link) => (
             <Link
               key={link.href}

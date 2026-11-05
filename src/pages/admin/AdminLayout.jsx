@@ -5,10 +5,11 @@ import {
   GraduationCap, ClipboardList, FileText, Award, CreditCard,
   Settings, Menu, X, LogOut, ChevronRight, ExternalLink,
   Bell, TrendingUp, FolderOpen, ScrollText, Tag, BarChart3,
-  ShieldCheck, ChevronDown, ChevronUp, AlertCircle
+  ShieldCheck, ChevronDown, ChevronUp, AlertCircle, Sun, Moon
 } from 'lucide-react';
 import { auth } from '../../lib/auth';
 import { apiFetch } from '../../lib/api';
+import { useTheme } from '../../context/ThemeContext';
 
 const adminNav = [
   { label: 'Overview', items: [
@@ -40,6 +41,7 @@ const adminNav = [
 ];
 
 export default function AdminLayout({ children, title, subtitle }) {
+  const { isDark, toggleTheme } = useTheme();
   const [location, setLocation] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [adminUser, setAdminUser] = useState('admin@godolinstitute.so');
@@ -149,6 +151,15 @@ export default function AdminLayout({ children, title, subtitle }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to night mode'}
+              title={isDark ? 'Switch to light mode' : 'Switch to night mode'}
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center justify-center border border-border"
+            >
+              {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+            </button>
             {pendingCount > 0 && (
               <Link href="/admin/payments"
                 className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors">
