@@ -42,6 +42,7 @@ export default function Footer() {
   const institutionLinks = [
     { label: 'About Us', href: '/about' },
     { label: 'Instructors', href: '/instructors' },
+    { label: 'Blog & Insights', href: '/blog' },
     { label: 'Executive Workshops', href: '/categories' },
     { label: 'Verify Certificate', href: '/verify' },
     { label: 'Contact & Admissions', href: '/contact' },

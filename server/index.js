@@ -711,10 +711,10 @@ export function createApiRouter() {
   // Public: Record user interaction (like, share, view)
   const handlePostInteraction = (req, res) => {
     const db = loadDB();
-    const postId = Number(req.params.id);
-    const { type } = req.body || {};
-    const post = (db.posts || db.blog || []).find(p => p.id === postId);
+    const param = req.params.id;
+    const post = (db.posts || db.blog || []).find(p => p.id === Number(param) || p.slug === param);
     if (!post) return res.status(404).json({ error: 'Post not found' });
+    const postId = post.id;
 
     db.post_metrics = db.post_metrics || [];
     let metrics = db.post_metrics.find(m => m.postId === postId);
@@ -766,14 +766,15 @@ export function createApiRouter() {
   // Public: Add comment to post
   const handleAddPostComment = (req, res) => {
     const db = loadDB();
-    const postId = Number(req.params.id);
+    const param = req.params.id;
     const { authorName, authorEmail, content } = req.body || {};
     if (!authorName || !content) {
       return res.status(400).json({ error: 'Name and comment message are required.' });
     }
 
-    const post = (db.posts || db.blog || []).find(p => p.id === postId);
+    const post = (db.posts || db.blog || []).find(p => p.id === Number(param) || p.slug === param);
     if (!post) return res.status(404).json({ error: 'Post not found' });
+    const postId = post.id;
 
     db.post_comments = db.post_comments || [];
     const newComment = {
@@ -818,7 +819,9 @@ export function createApiRouter() {
   // Public: List comments for post
   const handleGetPostComments = (req, res) => {
     const db = loadDB();
-    const postId = Number(req.params.id);
+    const param = req.params.id;
+    const post = (db.posts || db.blog || []).find(p => p.id === Number(param) || p.slug === param);
+    const postId = post ? post.id : Number(param);
     const comments = (db.post_comments || []).filter(c => c.postId === postId && c.status === 'approved');
     res.json(comments);
   };

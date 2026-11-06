@@ -16,6 +16,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Blog from './pages/Blog';
+import BlogPost from './pages/BlogPost';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import VerifyCertificate from './pages/VerifyCertificate';
@@ -119,6 +120,12 @@ export default function App() {
         </Route>
         <Route path="/blog">
           <Layout><Blog /></Layout>
+        </Route>
+        <Route path="/blog/:slug">
+          <Layout><BlogPost /></Layout>
+        </Route>
+        <Route path="/posts/:slug">
+          <Layout><BlogPost /></Layout>
         </Route>
         <Route path="/about">
           <Layout><About /></Layout>

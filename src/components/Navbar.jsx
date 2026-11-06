@@ -38,6 +38,7 @@ export default function Navbar() {
     { label: 'Courses', href: '/courses' },
     { label: 'Workshops', href: '/categories' },
     { label: 'Instructors', href: '/instructors' },
+    { label: 'Blog', href: '/blog' },
     { label: 'About', href: '/about' },
     { label: 'Contact', href: '/contact' }
   ];
