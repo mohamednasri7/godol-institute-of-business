@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Search, CheckCircle, XCircle, RefreshCw, Eye, MessageCircle,
   Copy, Phone, BookOpen, User, Filter, X, ChevronDown,
-  AlertTriangle, Clock, ShieldCheck, ShieldX, Clipboard, FileText
+  AlertTriangle, Clock, ShieldCheck, ShieldX, Clipboard, FileText,
+  Download
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
+import { exportToCSV } from '../../lib/exportUtils';
 
 const STATUS_CONFIG = {
   pending_verification: { label: 'Pending Verification', color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -175,8 +177,27 @@ export default function AdminPayments() {
               value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
               className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs outline-none focus:border-primary" />
           </div>
-          <button onClick={fetchPayments} className="p-2.5 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-primary transition-colors">
+          <button onClick={fetchPayments} className="p-2.5 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-primary transition-colors" title="Refresh">
             <RefreshCw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => exportToCSV(filtered, 'godol_payments', [
+              { key: 'transactionRef', label: 'Reference' },
+              { key: 'studentName', label: 'Student' },
+              { key: 'studentEmail', label: 'Email' },
+              { key: 'studentPhone', label: 'Phone' },
+              { key: 'courseTitle', label: 'Course' },
+              { key: 'claimedAmount', label: 'Claimed ($)' },
+              { key: 'verifiedAmount', label: 'Verified ($)' },
+              { key: 'provider', label: 'Provider' },
+              { key: 'status', label: 'Status' },
+              { key: 'submittedAt', label: 'Submitted Date' }
+            ])}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-xs"
+            title="Export table to CSV"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Export CSV</span>
           </button>
         </div>
 

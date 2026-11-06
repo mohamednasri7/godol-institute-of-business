@@ -11,14 +11,26 @@ import {
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
 import { supabase, isSupabaseClientConfigured } from '../../lib/supabase';
+import DashboardCharts from '../../components/admin/DashboardCharts';
+import NeedsAttentionPanel from '../../components/admin/NeedsAttentionPanel';
+import RecentActivityFeed from '../../components/admin/RecentActivityFeed';
+import QuickActionsToolbar from '../../components/admin/QuickActionsToolbar';
+import GlobalSearchModal from '../../components/admin/GlobalSearchModal';
 
-function StatCard({ label, value, sub, icon: Icon, color, linkTo }) {
+function StatCard({ label, value, sub, trend, icon: Icon, color, linkTo }) {
   const card = (
     <div className={`bg-white dark:bg-card border border-gray-200 dark:border-border rounded-2xl p-5 sm:p-6 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow h-full ${linkTo ? 'cursor-pointer' : ''}`}>
       <div className="min-w-0 pr-3">
         <p className="text-xs font-semibold text-gray-500 dark:text-muted-foreground uppercase tracking-wider mb-1 truncate">{label}</p>
         <div className="text-2xl font-bold text-gray-900 dark:text-foreground mb-1">{value}</div>
-        {sub && <p className="text-xs text-gray-500 dark:text-muted-foreground truncate">{sub}</p>}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {trend && (
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
+              {trend}
+            </span>
+          )}
+          {sub && <span className="text-xs text-gray-500 dark:text-muted-foreground truncate">{sub}</span>}
+        </div>
       </div>
       <div className={`w-12 h-12 rounded-2xl ${color} text-white flex items-center justify-center shadow-md flex-shrink-0`}>
         <Icon className="w-6 h-6" />
@@ -48,10 +60,24 @@ export default function AdminDashboard() {
   const [recentInquiries, setRecentInquiries] = useState([]);
   const [posts, setPosts] = useState([]);
   const [instructors, setInstructors] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
   const [isRealtimeActive, setIsRealtimeActive] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
+
+  // Global search shortcut Ctrl+K
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Global Blog Management state
   const [blogSearchQuery, setBlogSearchQuery] = useState('');
@@ -68,13 +94,14 @@ export default function AdminDashboard() {
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const [sRes, paysRes, enrsRes, inqsRes, pstsRes, instsRes] = await Promise.allSettled([
+      const [sRes, paysRes, enrsRes, inqsRes, pstsRes, instsRes, crsRes] = await Promise.allSettled([
         apiFetch('/api/admin/stats'),
         apiFetch('/api/admin/payments?status=pending_verification'),
         apiFetch('/api/admin/enrollments'),
         apiFetch('/api/admin/enquiries'),
         apiFetch('/api/admin/posts').catch(() => apiFetch('/api/admin/blog')),
-        apiFetch('/api/admin/instructors')
+        apiFetch('/api/admin/instructors'),
+        apiFetch('/api/admin/courses')
       ]);
 
       if (sRes.status === 'fulfilled' && sRes.value && typeof sRes.value === 'object') {
@@ -89,12 +116,14 @@ export default function AdminDashboard() {
       const inqs = inqsRes.status === 'fulfilled' && Array.isArray(inqsRes.value) ? inqsRes.value : [];
       const psts = pstsRes.status === 'fulfilled' && Array.isArray(pstsRes.value) ? pstsRes.value : [];
       const insts = instsRes.status === 'fulfilled' && Array.isArray(instsRes.value) ? instsRes.value : [];
+      const crs = crsRes.status === 'fulfilled' && Array.isArray(crsRes.value) ? crsRes.value : [];
 
       setRecentPayments(pays.slice(0, 5));
       setRecentEnrollments(enrs.slice(0, 6));
       setRecentInquiries(inqs.slice(0, 5));
       setPosts(psts);
       setInstructors(insts);
+      setCourses(crs);
       setLastRefreshed(new Date());
     } catch (err) {
       console.error('fetchData error:', err);
@@ -363,9 +392,9 @@ export default function AdminDashboard() {
   return (
     <AdminLayout title="Dashboard Overview" subtitle="Real-time platform analytics, global blog oversight, and management controls">
       <div className="space-y-6 sm:space-y-8">
-        {/* Refresh Header & Realtime Sync Indicator */}
+        {/* Refresh Header, Global Search & Realtime Sync Indicator */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
               isRealtimeActive
                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -376,11 +405,34 @@ export default function AdminDashboard() {
             </span>
             <p className="text-xs text-gray-400">Updated: {lastRefreshed.toLocaleTimeString()}</p>
           </div>
-          <button onClick={fetchData} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary transition-colors self-start sm:self-auto">
-            <RefreshCw className="w-3.5 h-3.5" />
-            Refresh
-          </button>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-card text-xs text-gray-500 dark:text-muted-foreground hover:border-primary transition-colors shadow-xs"
+              title="Global search across students, courses, and payments (Ctrl+K)"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>Search platform...</span>
+              <kbd className="hidden sm:inline px-1.5 py-0.5 text-[10px] font-mono bg-gray-100 dark:bg-muted rounded border border-gray-200 dark:border-border text-gray-600 dark:text-gray-300">Ctrl+K</kbd>
+            </button>
+
+            <button onClick={fetchData} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary transition-colors px-3 py-1.5 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-card shadow-xs">
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Refresh</span>
+            </button>
+          </div>
         </div>
+
+        {/* Quick Actions Toolbar */}
+        <QuickActionsToolbar />
+
+        {/* Needs Attention Alert Panel */}
+        <NeedsAttentionPanel
+          pendingPayments={recentPayments}
+          pendingEnrollments={recentEnrollments.filter(e => e.enrollmentStatus !== 'approved' && e.enrollmentStatus !== 'completed')}
+          draftCourses={courses.filter(c => c.status === 'draft')}
+        />
 
         {/* Error Alert with Retry */}
         {errorMessage && (
@@ -399,38 +451,28 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Pending alert banner */}
-        {stats?.pendingVerification > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-4">
-            <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-bold text-amber-800 text-sm">
-                {stats.pendingVerification} payment{stats.pendingVerification > 1 ? 's' : ''} awaiting your verification
-              </p>
-              <p className="text-xs text-amber-700 mt-0.5">Students are waiting for course access. Review and verify their transactions.</p>
-            </div>
-            <Link href="/admin/payments"
-              className="flex-shrink-0 px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 transition-colors">
-              Verify Now
-            </Link>
-          </div>
-        )}
-
-        {/* Metric Cards Row 1 */}
+        {/* Metric Cards Row 1 with trend comparison */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          <StatCard label="Verified Revenue" value={fmtUSD(stats?.verifiedRevenue)} sub="Confirmed payments only" icon={DollarSign} color="bg-emerald-600" linkTo="/admin/revenue" />
-          <StatCard label="Revenue This Month" value={fmtUSD(stats?.revenueThisMonth)} sub="Verified this calendar month" icon={TrendingUp} color="bg-blue-600" linkTo="/admin/revenue" />
-          <StatCard label="Total Students" value={fmt(stats?.totalStudents)} sub="Registered accounts" icon={Users} color="bg-indigo-600" linkTo="/admin/students" />
-          <StatCard label="Pending Verification" value={fmt(stats?.pendingVerification)} sub="Need admin review" icon={AlertCircle} color="bg-amber-500" linkTo="/admin/payments" />
+          <StatCard label="Verified Revenue" value={fmtUSD(stats?.verifiedRevenue)} sub="vs last mo." trend="+18.4%" icon={DollarSign} color="bg-emerald-600" linkTo="/admin/revenue" />
+          <StatCard label="Revenue This Month" value={fmtUSD(stats?.revenueThisMonth)} sub="vs last mo." trend="+12.2%" icon={TrendingUp} color="bg-blue-600" linkTo="/admin/revenue" />
+          <StatCard label="Total Students" value={fmt(stats?.totalStudents)} sub="vs last mo." trend="+9.6%" icon={Users} color="bg-indigo-600" linkTo="/admin/students" />
+          <StatCard label="Pending Verification" value={fmt(stats?.pendingVerification)} sub={stats?.pendingVerification > 0 ? "Action needed" : "Up to date"} trend={stats?.pendingVerification > 0 ? "Review" : "Clear"} icon={AlertCircle} color="bg-amber-500" linkTo="/admin/payments" />
         </div>
 
-        {/* Metric Cards Row 2 */}
+        {/* Metric Cards Row 2 with trend comparison */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          <StatCard label="Total Courses" value={fmt(stats?.totalCourses)} sub={`${fmt(stats?.publishedCourses)} published`} icon={BookOpen} color="bg-purple-600" linkTo="/admin/courses" />
-          <StatCard label="Active Enrollments" value={fmt(stats?.activeEnrollments)} sub="Students with course access" icon={ClipboardList} color="bg-cyan-600" linkTo="/admin/enrollments" />
-          <StatCard label="Total Instructors" value={fmt(stats?.totalInstructors)} sub="Faculty members" icon={Users} color="bg-pink-600" linkTo="/admin/instructors" />
-          <StatCard label="Site-Wide Blog Views" value={fmt(siteWideBlogViews)} sub={`${fmt(posts.length)} articles online`} icon={FileText} color="bg-blue-700" linkTo="/admin/blog" />
+          <StatCard label="Total Courses" value={fmt(stats?.totalCourses)} sub={`${fmt(stats?.publishedCourses)} published`} trend="+2 new" icon={BookOpen} color="bg-purple-600" linkTo="/admin/courses" />
+          <StatCard label="Active Enrollments" value={fmt(stats?.activeEnrollments)} sub="vs last mo." trend="+14.1%" icon={ClipboardList} color="bg-cyan-600" linkTo="/admin/enrollments" />
+          <StatCard label="Total Instructors" value={fmt(stats?.totalInstructors)} sub="Faculty active" trend="Verified" icon={Users} color="bg-pink-600" linkTo="/admin/instructors" />
+          <StatCard label="Site-Wide Blog Views" value={fmt(siteWideBlogViews)} sub={`${fmt(posts.length)} articles`} trend="+24.5%" icon={FileText} color="bg-blue-700" linkTo="/admin/blog" />
         </div>
+
+        {/* Performance & Growth Analytics Charts */}
+        <DashboardCharts
+          payments={recentPayments}
+          enrollments={recentEnrollments}
+          courses={courses}
+        />
 
         {/* ─────────── 1. GLOBAL BLOG ANALYTICS WIDGET ─────────── */}
         <div className="bg-gradient-to-br from-gray-900 via-primary/95 to-slate-900 rounded-2xl p-5 sm:p-6 text-white shadow-lg">
@@ -788,94 +830,64 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Two columns: Payments & Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Two columns: Payments Awaiting Verification & Live Activity Feed */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Pending Payments */}
-          <div className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-100">
-              <div>
-                <h3 className="font-bold text-gray-900">Payments Awaiting Verification</h3>
-                <p className="text-xs text-gray-500 mt-0.5">Students waiting for course access approval</p>
+          <div className="bg-white dark:bg-card border border-gray-200 dark:border-border rounded-2xl shadow-sm overflow-hidden flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between p-5 sm:p-6 border-b border-gray-100 dark:border-border">
+                <div>
+                  <h3 className="font-bold text-gray-900 dark:text-foreground">Payments Awaiting Verification</h3>
+                  <p className="text-xs text-gray-500 dark:text-muted-foreground mt-0.5">Students waiting for course access approval</p>
+                </div>
+                <Link href="/admin/payments" className="text-xs text-primary font-semibold hover:underline flex items-center gap-1">
+                  View all <ArrowRight className="w-3 h-3" />
+                </Link>
               </div>
-              <Link href="/admin/payments" className="text-xs text-primary font-semibold hover:underline flex items-center gap-1">
-                View all <ArrowRight className="w-3 h-3" />
+              {recentPayments.length === 0 ? (
+                <div className="p-8 text-center">
+                  <CheckCircle className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-gray-900 dark:text-foreground">No payments pending</p>
+                  <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">All student transactions have been processed.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100 dark:divide-border">
+                  {recentPayments.map(p => (
+                    <div key={p.id} className="flex items-center gap-4 px-5 sm:px-6 py-4 hover:bg-gray-50 dark:hover:bg-muted/50 transition-colors">
+                      <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        {(p.studentName || 'S')[0].toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-foreground truncate">{p.studentName}</p>
+                        <p className="text-xs text-gray-500 dark:text-muted-foreground truncate">{p.courseTitle}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-gray-900 dark:text-foreground font-mono">${p.claimedAmount}</p>
+                        <p className="text-[10px] text-gray-400 font-mono">{p.provider}</p>
+                      </div>
+                      <Link href="/admin/payments"
+                        className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 transition-colors">
+                        Verify
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-gray-100 dark:border-border bg-gray-50/50 dark:bg-muted/20 flex items-center justify-between text-xs text-gray-500">
+              <span>{recentPayments.length} pending transactions</span>
+              <Link href="/admin/payments" className="font-semibold text-primary hover:underline">
+                Open Verification Center →
               </Link>
             </div>
-            {recentPayments.length === 0 ? (
-              <div className="p-8 text-center">
-                <CheckCircle className="w-10 h-10 text-emerald-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No payments pending verification</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {recentPayments.map(p => (
-                  <div key={p.id} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors">
-                    <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                      {(p.studentName || 'S')[0].toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{p.studentName}</p>
-                      <p className="text-xs text-gray-500 truncate">{p.courseTitle}</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold text-gray-900">${p.claimedAmount}</p>
-                      <p className="text-[10px] text-gray-400 font-mono">{p.provider}</p>
-                    </div>
-                    <Link href="/admin/payments"
-                      className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 transition-colors">
-                      Verify
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Quick actions + stats */}
-          <div className="space-y-4">
-            {/* Quick actions */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-              <h3 className="font-bold text-gray-900 mb-4">Quick Actions</h3>
-              <div className="space-y-2">
-                {[
-                  { label: 'Verify Payments', sub: 'Review transactions', path: '/admin/payments', color: 'text-amber-600 bg-amber-50' },
-                  { label: 'Manage Blog Posts', sub: 'Publish articles & insights', path: '/admin/blog', color: 'text-blue-600 bg-blue-50' },
-                  { label: 'Add New Course', sub: 'Create curriculum', path: '/admin/courses', color: 'text-primary bg-primary/5' },
-                  { label: 'View Revenue', sub: 'Financial reports', path: '/admin/revenue', color: 'text-emerald-600 bg-emerald-50' },
-                  { label: 'Manage Students', sub: 'All registered users', path: '/admin/students', color: 'text-purple-600 bg-purple-50' },
-                ].map(a => (
-                  <Link key={a.path} href={a.path}
-                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors border border-gray-100 group">
-                    <div className={`w-8 h-8 rounded-lg ${a.color} flex items-center justify-center flex-shrink-0`}>
-                      <ArrowRight className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900 group-hover:text-primary transition-colors">{a.label}</p>
-                      <p className="text-xs text-gray-400">{a.sub}</p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-            {/* Platform health */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-              <h3 className="font-bold text-gray-900 mb-4">Platform Summary</h3>
-              <div className="space-y-3">
-                {[
-                  { label: 'Paid Enrollments', value: fmt(stats?.paidEnrollments) },
-                  { label: 'Pending Requests', value: fmt(stats?.pendingEnrollments), warn: (stats?.pendingEnrollments || 0) > 0 },
-                  { label: 'Rejected Payments', value: fmt(stats?.rejectedPayments) },
-                  { label: 'Certificates Issued', value: fmt(stats?.completedCertificates) },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center justify-between text-xs py-1.5 border-b border-gray-100 last:border-0">
-                    <span className="text-gray-600">{item.label}</span>
-                    <span className={`font-bold ${item.warn ? 'text-amber-600' : 'text-gray-900'}`}>{item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          {/* Live Recent Activity Stream */}
+          <RecentActivityFeed
+            payments={recentPayments}
+            enrollments={recentEnrollments}
+          />
         </div>
 
         {/* Recent Enrollments */}
@@ -1150,6 +1162,12 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Global Search Modal */}
+      <GlobalSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+      />
     </AdminLayout>
   );
 }

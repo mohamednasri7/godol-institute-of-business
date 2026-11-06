@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Search, Plus, Edit2, Trash2, CheckCircle, XCircle,
-  Eye, BookOpen, X, Star, Users, Filter, Upload
+  Eye, BookOpen, X, Star, Users, Filter, Upload, Download,
+  Archive
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
+import { exportToCSV } from '../../lib/exportUtils';
 
 const STATUS_COLOR = {
   published: 'bg-emerald-100 text-emerald-700',
@@ -104,11 +106,20 @@ export default function AdminCourses() {
     } catch (err) { showToast(err.message, 'error'); }
   };
 
+  const handleArchive = async (course) => {
+    if (!confirm(`Archive "${course.title}"? The course will be hidden from the active public catalog.`)) return;
+    try {
+      await apiFetch(`/api/admin/courses/${course.id}`, { method: 'PUT', body: JSON.stringify({ status: 'archived' }) });
+      showToast('Course moved to archive.');
+      fetchCourses();
+    } catch (err) { showToast(err.message, 'error'); }
+  };
+
   const handleDelete = async (course) => {
-    if (!confirm(`Delete "${course.title}"? This cannot be undone.`)) return;
+    if (!confirm(`Permanently delete "${course.title}"? For safer record-keeping, you can choose to Archive instead.`)) return;
     try {
       await apiFetch(`/api/admin/courses/${course.id}`, { method: 'DELETE' });
-      showToast('Course deleted.');
+      showToast('Course permanently removed.');
       fetchCourses();
     } catch (err) { showToast(err.message, 'error'); }
   };
@@ -163,6 +174,23 @@ export default function AdminCourses() {
             <input type="text" placeholder="Search courses..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
               className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-xs outline-none focus:border-primary" />
           </div>
+          <button
+            onClick={() => exportToCSV(filtered, 'godol_courses', [
+              { key: 'title', label: 'Title' },
+              { key: 'categoryName', label: 'Category' },
+              { key: 'instructorName', label: 'Instructor' },
+              { key: 'price', label: 'Price ($)' },
+              { key: 'level', label: 'Level' },
+              { key: 'status', label: 'Status' },
+              { key: 'approvalStatus', label: 'Approval' },
+              { key: 'enrolledCount', label: 'Enrolled' }
+            ])}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-700 hover:bg-gray-50 transition-colors shadow-xs"
+            title="Export courses table to CSV"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Export CSV</span>
+          </button>
           <button onClick={openAdd} className="flex items-center gap-1.5 px-4 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/90">
             <Plus className="w-4 h-4" /> Add Course
           </button>
@@ -214,8 +242,9 @@ export default function AdminCourses() {
                             <button onClick={() => handleReject(c)} className="px-2.5 py-1.5 bg-red-500 text-white rounded-lg text-[11px] font-bold hover:bg-red-600">Reject</button>
                           </>
                         )}
-                        <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-primary rounded-lg hover:bg-gray-100"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => handleDelete(c)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-primary rounded-lg hover:bg-gray-100" title="Edit syllabus"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleArchive(c)} className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-gray-100" title="Archive course"><Archive className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(c)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100" title="Permanently delete"><Trash2 className="w-4 h-4" /></button>
                         <button onClick={() => toggleFeatured(c)} className={`p-1.5 rounded-lg hover:bg-gray-100 ${c.featured ? 'text-amber-500' : 'text-gray-300 hover:text-amber-500'}`} title="Toggle featured">
                           <Star className="w-4 h-4" />
                         </button>

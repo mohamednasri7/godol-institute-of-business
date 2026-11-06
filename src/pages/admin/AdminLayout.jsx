@@ -5,7 +5,7 @@ import {
   GraduationCap, ClipboardList, FileText, Award, CreditCard,
   Settings, Menu, X, LogOut, ChevronRight, ExternalLink,
   Bell, TrendingUp, FolderOpen, ScrollText, Tag, BarChart3,
-  ShieldCheck, ChevronDown, ChevronUp, AlertCircle, Sun, Moon
+  ShieldCheck, ChevronDown, ChevronUp, AlertCircle, Sun, Moon, User
 } from 'lucide-react';
 import { auth } from '../../lib/auth';
 import { apiFetch } from '../../lib/api';
@@ -50,6 +50,8 @@ export default function AdminLayout({ children, title, subtitle }) {
   const [adminUser, setAdminUser] = useState('admin@godolinstitute.so');
   const [pendingCount, setPendingCount] = useState(0);
   const [collapsedSections, setCollapsedSections] = useState({});
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   useEffect(() => {
     document.title = title ? `${title} | Godol Admin` : 'Admin | Godol';
@@ -200,14 +202,85 @@ export default function AdminLayout({ children, title, subtitle }) {
 
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <ThemeToggleSwitch />
-            {pendingCount > 0 && (
-              <Link href="/admin/payments"
-                className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-colors">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">{pendingCount} pending</span>
-                <span className="xs:hidden">{pendingCount}</span>
-              </Link>
-            )}
+
+            {/* Notification Bell with Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => { setIsNotificationOpen(!isNotificationOpen); setIsUserMenuOpen(false); }}
+                className="p-2 text-foreground/70 hover:text-foreground hover:bg-muted rounded-xl transition-colors relative"
+                aria-label="View notifications"
+              >
+                <Bell className="w-4 h-4" />
+                {pendingCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                )}
+              </button>
+
+              {isNotificationOpen && (
+                <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white dark:bg-card border border-border rounded-2xl shadow-xl z-50 p-3 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between pb-2 border-b border-border">
+                    <span className="text-xs font-bold text-foreground">Notifications</span>
+                    <span className="text-[10px] text-muted-foreground">{pendingCount} pending</span>
+                  </div>
+                  {pendingCount > 0 ? (
+                    <Link
+                      href="/admin/payments"
+                      onClick={() => setIsNotificationOpen(false)}
+                      className="flex items-start gap-2.5 p-2 rounded-xl hover:bg-muted transition-colors text-xs"
+                    >
+                      <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-foreground">{pendingCount} payment{pendingCount > 1 ? 's' : ''} awaiting review</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Students submitted transactions requiring your verification.</p>
+                      </div>
+                    </Link>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-4">No new notifications</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* User Profile Menu with Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => { setIsUserMenuOpen(!isUserMenuOpen); setIsNotificationOpen(false); }}
+                className="flex items-center gap-2 p-1 pl-2 sm:px-2.5 sm:py-1.5 rounded-xl hover:bg-muted transition-colors border border-transparent hover:border-border"
+              >
+                <div className="w-7 h-7 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {(adminUser[0] || 'A').toUpperCase()}
+                </div>
+                <span className="text-xs font-semibold text-foreground hidden md:inline truncate max-w-[120px]">
+                  {adminUser.split('@')[0]}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground hidden sm:inline" />
+              </button>
+
+              {isUserMenuOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-card border border-border rounded-2xl shadow-xl z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="px-3 py-2 border-b border-border">
+                    <p className="text-xs font-bold text-foreground truncate">{adminUser}</p>
+                    <p className="text-[10px] text-muted-foreground">Administrator</p>
+                  </div>
+                  <Link
+                    href="/admin/settings"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-muted rounded-lg transition-colors font-medium"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>System Settings</span>
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors font-medium"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
             <Link href="/" target="_blank"
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline bg-primary/10 px-2.5 sm:px-3 py-1.5 rounded-lg border border-primary/20">
               <span className="hidden sm:inline">View Site</span>
