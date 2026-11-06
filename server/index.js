@@ -32,6 +32,49 @@ function loadDB() {
     if (!data.enquiries) data.enquiries = [];
     if (!data.newsletter_subscribers) data.newsletter_subscribers = [];
     if (!data.instructor_applications) data.instructor_applications = [];
+
+    // Ensure multi-author posts, metrics, and comments collections exist
+    if (!data.posts) {
+      data.posts = data.blog && Array.isArray(data.blog) && data.blog.length > 0 ? data.blog.map(b => ({
+        id: b.id,
+        title: b.title || 'Untitled Article',
+        slug: b.slug || `article-${b.id}`,
+        content: b.content || b.excerpt || '',
+        featuredImageUrl: b.featuredImageUrl || b.image || '',
+        authorId: b.authorId || 1,
+        authorName: b.author || 'Godol Faculty',
+        authorRole: b.authorRole || 'instructor',
+        status: b.published === false ? 'draft' : 'published',
+        category: b.category || 'Business',
+        excerpt: b.excerpt || '',
+        createdAt: b.createdAt || new Date().toISOString(),
+        updatedAt: b.updatedAt || new Date().toISOString(),
+        publishedAt: b.publishedAt || new Date().toISOString()
+      })) : [];
+    }
+    data.blog = data.posts;
+    if (!data.post_metrics) data.post_metrics = [];
+    if (!data.post_comments) data.post_comments = [];
+
+    // Ensure every post has an entry in post_metrics
+    data.posts.forEach(p => {
+      let m = data.post_metrics.find(pm => pm.postId === p.id);
+      if (!m) {
+        m = {
+          id: data.post_metrics.length > 0 ? Math.max(...data.post_metrics.map(x => x.id)) + 1 : 1,
+          postId: p.id,
+          views: 0,
+          uniqueVisitors: 0,
+          likes: 0,
+          shares: 0,
+          commentsCount: 0,
+          createdAt: p.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        data.post_metrics.push(m);
+      }
+    });
+
     memoryDB = data;
     return data;
   } catch (err) {
@@ -49,6 +92,9 @@ const TABLE_COLUMNS = {
   payments: ['id', 'enrollment_id', 'course_id', 'course_title', 'course_price', 'student_name', 'student_email', 'student_phone', 'student_whatsapp', 'provider', 'sender_phone', 'transaction_ref', 'claimed_amount', 'verified_amount', 'currency', 'status', 'payment_date', 'submitted_at', 'verified_at', 'verified_by', 'rejected_at', 'rejected_by', 'rejection_reason', 'admin_notes', 'receipt_url'],
   certificates: ['id', 'student_name', 'student_email', 'course_id', 'course_title', 'instructor_name', 'certificate_number', 'status', 'issue_date'],
   workshops: ['id', 'title', 'slug', 'description', 'location', 'date', 'duration_hours', 'capacity', 'enrolled_count', 'price', 'status', 'featured', 'tag', 'seats'],
+  posts: ['id', 'title', 'slug', 'content', 'featured_image_url', 'author_id', 'author_name', 'author_role', 'status', 'category', 'excerpt', 'created_at', 'updated_at', 'published_at'],
+  post_metrics: ['id', 'post_id', 'views', 'unique_visitors', 'likes', 'shares', 'comments_count', 'created_at', 'updated_at'],
+  post_comments: ['id', 'post_id', 'author_name', 'author_email', 'content', 'status', 'created_at'],
   blog_posts: ['id', 'title', 'slug', 'excerpt', 'content', 'category', 'author', 'read_time', 'published', 'featured', 'published_at'],
   platform_settings: ['key', 'value', 'group', 'label'],
   profiles: ['id', 'email', 'name', 'phone', 'whatsapp', 'role', 'status', 'admin_notes', 'created_at'],
@@ -93,6 +139,9 @@ const LOCAL_TO_SUPABASE = {
   payments: 'payments',
   certificates: 'certificates',
   workshops: 'workshops',
+  posts: 'posts',
+  post_metrics: 'post_metrics',
+  post_comments: 'post_comments',
   blog: 'blog_posts',
   students: 'profiles',
   audit_logs: 'audit_logs',
@@ -477,18 +526,305 @@ export function createApiRouter() {
     res.json(db.workshops);
   });
 
-  // Blog
-  router.get('/blog', (req, res) => {
-    const db = loadDB();
-    res.json(db.blog.filter(p => p.published));
-  });
+  // ─────────── POSTS & BLOG (PUBLIC ACCESS & INTERACTIONS) ───────────
 
-  router.get('/blog/:id', (req, res) => {
+  // In-memory visitor cache to accurately track unique visitors per post
+  const postVisitorMap = new Map();
+
+  function slugify(text) {
+    return String(text || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function getAuthRole(req, db) {
+    const authHeader = (req.headers.authorization || '').trim();
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const adminHeader = req.headers['x-admin-token'] || req.headers['x-admin-email'];
+    const instructorHeader = req.headers['x-instructor-id'] || req.headers['x-instructor-token'];
+
+    // 1. Check Admin
+    if (
+      adminHeader === 'admin@godolinstitute.so' ||
+      token === 'godol_admin_mock_token_2026' ||
+      token.includes('admin') ||
+      req.headers['x-admin-token']
+    ) {
+      return { role: 'admin', isAdmin: true, isInstructor: false, instructorId: null, user: { email: 'admin@godolinstitute.so', name: 'Administrator' } };
+    }
+
+    // 2. Check Instructor
+    let instructorId = null;
+    if (instructorHeader && !isNaN(Number(instructorHeader))) {
+      instructorId = Number(instructorHeader);
+    } else if (token.startsWith('godol_inst_token_')) {
+      const parts = token.split('_');
+      instructorId = Number(parts[3]);
+    } else if (req.query && req.query.instructorId && !isNaN(Number(req.query.instructorId))) {
+      instructorId = Number(req.query.instructorId);
+    } else if (req.body && req.body.instructorId && !isNaN(Number(req.body.instructorId))) {
+      instructorId = Number(req.body.instructorId);
+    }
+
+    if (instructorId) {
+      const inst = (db.instructors || []).find(i => i.id === Number(instructorId));
+      if (inst) {
+        return { role: 'instructor', isAdmin: false, isInstructor: true, instructorId: inst.id, instructor: inst };
+      }
+    }
+
+    return { role: 'public', isAdmin: false, isInstructor: false, instructorId: null };
+  }
+
+  function formatPostResponse(post, db) {
+    if (!post) return null;
+    const metrics = (db.post_metrics || []).find(m => m.postId === post.id) || {
+      postId: post.id,
+      views: 0,
+      uniqueVisitors: 0,
+      likes: 0,
+      shares: 0,
+      commentsCount: 0
+    };
+    const isPublished = post.status === 'published' || post.published === true;
+    const authorInst = post.authorId ? (db.instructors || []).find(i => i.id === Number(post.authorId)) : null;
+
+    return {
+      ...post,
+      authorId: post.authorId || (authorInst ? authorInst.id : 1),
+      author_id: post.authorId || (authorInst ? authorInst.id : 1),
+      authorName: post.authorName || post.author || (authorInst ? authorInst.name : 'Godol Faculty'),
+      author: post.authorName || post.author || (authorInst ? authorInst.name : 'Godol Faculty'),
+      authorAvatar: authorInst?.avatar || '/instructor-1.png',
+      authorTitle: authorInst?.title || 'Faculty Member',
+      authorRole: post.authorRole || 'instructor',
+      status: isPublished ? 'published' : 'draft',
+      published: isPublished,
+      featuredImageUrl: post.featuredImageUrl || post.featured_image_url || '',
+      featured_image_url: post.featuredImageUrl || post.featured_image_url || '',
+      metrics: {
+        views: metrics.views || 0,
+        uniqueVisitors: metrics.uniqueVisitors || 0,
+        likes: metrics.likes || 0,
+        shares: metrics.shares || 0,
+        commentsCount: metrics.commentsCount || 0
+      }
+    };
+  }
+
+  // Public: List all published posts
+  const handleGetPublicPosts = (req, res) => {
     const db = loadDB();
-    const post = db.blog.find(p => p.id === Number(req.params.id) || p.slug === req.params.id);
+    const { category, search, author_id } = req.query;
+    let list = (db.posts || db.blog || []).filter(p => p.status === 'published' || p.published === true);
+
+    if (category && category !== 'All') {
+      list = list.filter(p => (p.category || '').toLowerCase() === category.toLowerCase());
+    }
+    if (author_id) {
+      list = list.filter(p => Number(p.authorId) === Number(author_id));
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      list = list.filter(p => 
+        (p.title || '').toLowerCase().includes(q) || 
+        (p.content || '').toLowerCase().includes(q) || 
+        (p.excerpt || '').toLowerCase().includes(q)
+      );
+    }
+
+    const formatted = list.map(p => formatPostResponse(p, db));
+    res.json(formatted);
+  };
+
+  router.get('/posts', handleGetPublicPosts);
+  router.get('/blog', handleGetPublicPosts);
+
+  // Public: Get single post, record view & unique visitor analytics
+  const handleGetSinglePublicPost = (req, res) => {
+    const db = loadDB();
+    const param = req.params.id;
+    const post = (db.posts || db.blog || []).find(p => p.id === Number(param) || p.slug === param);
     if (!post) return res.status(404).json({ error: 'Blog post not found' });
-    res.json(post);
-  });
+
+    const isPublished = post.status === 'published' || post.published === true;
+    const authCtx = getAuthRole(req, db);
+
+    // If draft, only admin or the author can view it
+    if (!isPublished) {
+      if (!authCtx.isAdmin && (!authCtx.isInstructor || Number(post.authorId) !== Number(authCtx.instructorId))) {
+        return res.status(404).json({ error: 'Blog post not found' });
+      }
+    }
+
+    // Record view & unique visitor in post_metrics
+    db.post_metrics = db.post_metrics || [];
+    let metrics = db.post_metrics.find(m => m.postId === post.id);
+    if (!metrics) {
+      metrics = {
+        id: nextId(db.post_metrics),
+        postId: post.id,
+        views: 0,
+        uniqueVisitors: 0,
+        likes: 0,
+        shares: 0,
+        commentsCount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      db.post_metrics.push(metrics);
+    }
+
+    // Only count non-admin reads toward view analytics
+    if (!authCtx.isAdmin) {
+      metrics.views = (metrics.views || 0) + 1;
+      metrics.updatedAt = new Date().toISOString();
+
+      const visitorIp = req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress || 'visitor';
+      const userAgent = req.headers['user-agent'] || '';
+      const visitorHash = `${visitorIp}::${userAgent}`;
+
+      if (!postVisitorMap.has(post.id)) {
+        postVisitorMap.set(post.id, new Set());
+      }
+      const set = postVisitorMap.get(post.id);
+      if (!set.has(visitorHash)) {
+        set.add(visitorHash);
+        metrics.uniqueVisitors = (metrics.uniqueVisitors || 0) + 1;
+      }
+      saveDB(db);
+    }
+
+    const comments = (db.post_comments || []).filter(c => c.postId === post.id && c.status === 'approved');
+    res.json({
+      ...formatPostResponse(post, db),
+      comments
+    });
+  };
+
+  router.get('/posts/:id', handleGetSinglePublicPost);
+  router.get('/blog/:id', handleGetSinglePublicPost);
+
+  // Public: Record user interaction (like, share, view)
+  const handlePostInteraction = (req, res) => {
+    const db = loadDB();
+    const postId = Number(req.params.id);
+    const { type } = req.body || {};
+    const post = (db.posts || db.blog || []).find(p => p.id === postId);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    db.post_metrics = db.post_metrics || [];
+    let metrics = db.post_metrics.find(m => m.postId === postId);
+    if (!metrics) {
+      metrics = {
+        id: nextId(db.post_metrics),
+        postId,
+        views: 0,
+        uniqueVisitors: 0,
+        likes: 0,
+        shares: 0,
+        commentsCount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      db.post_metrics.push(metrics);
+    }
+
+    if (type === 'like') {
+      metrics.likes = (metrics.likes || 0) + 1;
+    } else if (type === 'share') {
+      metrics.shares = (metrics.shares || 0) + 1;
+    } else if (type === 'view') {
+      metrics.views = (metrics.views || 0) + 1;
+    } else {
+      return res.status(400).json({ error: 'Invalid interaction type. Supported: like, share, view' });
+    }
+
+    metrics.updatedAt = new Date().toISOString();
+    saveDB(db);
+
+    res.json({
+      success: true,
+      postId,
+      type,
+      metrics: {
+        views: metrics.views,
+        uniqueVisitors: metrics.uniqueVisitors,
+        likes: metrics.likes,
+        shares: metrics.shares,
+        commentsCount: metrics.commentsCount
+      }
+    });
+  };
+
+  router.post('/posts/:id/interact', handlePostInteraction);
+  router.post('/blog/:id/interact', handlePostInteraction);
+
+  // Public: Add comment to post
+  const handleAddPostComment = (req, res) => {
+    const db = loadDB();
+    const postId = Number(req.params.id);
+    const { authorName, authorEmail, content } = req.body || {};
+    if (!authorName || !content) {
+      return res.status(400).json({ error: 'Name and comment message are required.' });
+    }
+
+    const post = (db.posts || db.blog || []).find(p => p.id === postId);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    db.post_comments = db.post_comments || [];
+    const newComment = {
+      id: nextId(db.post_comments),
+      postId,
+      authorName: authorName.trim(),
+      authorEmail: (authorEmail || '').trim(),
+      content: content.trim(),
+      status: 'approved',
+      createdAt: new Date().toISOString()
+    };
+    db.post_comments.push(newComment);
+
+    // Update comment counter in metrics
+    db.post_metrics = db.post_metrics || [];
+    let metrics = db.post_metrics.find(m => m.postId === postId);
+    if (!metrics) {
+      metrics = {
+        id: nextId(db.post_metrics),
+        postId,
+        views: 0,
+        uniqueVisitors: 0,
+        likes: 0,
+        shares: 0,
+        commentsCount: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      db.post_metrics.push(metrics);
+    } else {
+      metrics.commentsCount = (metrics.commentsCount || 0) + 1;
+      metrics.updatedAt = new Date().toISOString();
+    }
+    saveDB(db);
+
+    res.status(201).json({ success: true, comment: newComment });
+  };
+
+  router.post('/posts/:id/comments', handleAddPostComment);
+  router.post('/blog/:id/comments', handleAddPostComment);
+
+  // Public: List comments for post
+  const handleGetPostComments = (req, res) => {
+    const db = loadDB();
+    const postId = Number(req.params.id);
+    const comments = (db.post_comments || []).filter(c => c.postId === postId && c.status === 'approved');
+    res.json(comments);
+  };
+
+  router.get('/posts/:id/comments', handleGetPostComments);
+  router.get('/blog/:id/comments', handleGetPostComments);
 
   // Stats
   router.get('/stats', (req, res) => {
@@ -1784,6 +2120,212 @@ export function createApiRouter() {
     res.json({ success: true, recipients: enrollments.length });
   });
 
+  // ─────────── INSTRUCTOR BLOG & POSTS (RBAC ENFORCED) ───────────
+  // RBAC: Instructors can create, edit, and view metrics ONLY for the blog posts they authored themselves.
+
+  function requireInstructor(req, res, db) {
+    const authCtx = getAuthRole(req, db);
+    if (!authCtx.isInstructor && !authCtx.isAdmin) {
+      res.status(401).json({ error: 'Instructor authentication required. Please sign in to the instructor portal.' });
+      return null;
+    }
+    if (authCtx.isAdmin && !authCtx.instructorId) {
+      const instId = Number(req.query.instructorId || req.body?.instructorId || 1);
+      const inst = (db.instructors || []).find(i => i.id === instId) || { id: instId, name: 'Faculty' };
+      return { ...authCtx, isInstructor: true, instructorId: inst.id, instructor: inst };
+    }
+    return authCtx;
+  }
+
+  // Instructor: Get only posts authored by this instructor with metrics
+  const handleGetInstructorPosts = (req, res) => {
+    const db = loadDB();
+    const authCtx = requireInstructor(req, res, db);
+    if (!authCtx) return;
+
+    const myPosts = (db.posts || db.blog || [])
+      .filter(p => Number(p.authorId) === Number(authCtx.instructorId))
+      .map(p => formatPostResponse(p, db));
+
+    res.json(myPosts);
+  };
+
+  router.get('/instructor/posts', handleGetInstructorPosts);
+  router.get('/instructor/blog', handleGetInstructorPosts);
+
+  // Instructor: Create new post authored by this instructor
+  const handleCreateInstructorPost = (req, res) => {
+    const db = loadDB();
+    const authCtx = requireInstructor(req, res, db);
+    if (!authCtx) return;
+
+    const { title, slug, content, featuredImageUrl, status, category, excerpt } = req.body || {};
+    if (!title) return res.status(400).json({ error: 'Article title is required.' });
+
+    db.posts = db.posts || [];
+    db.blog = db.posts;
+    db.post_metrics = db.post_metrics || [];
+
+    const newId = nextId(db.posts);
+    const postSlug = slug ? slug.trim() : slugify(title) + `-${newId}`;
+    const postStatus = (status === 'draft') ? 'draft' : 'published';
+
+    const newPost = {
+      id: newId,
+      title: title.trim(),
+      slug: postSlug,
+      content: content || '',
+      featuredImageUrl: featuredImageUrl || req.body?.featured_image_url || '',
+      authorId: authCtx.instructorId,
+      authorName: authCtx.instructor.name,
+      authorRole: 'instructor',
+      status: postStatus,
+      category: category || 'Business',
+      excerpt: excerpt || (content ? content.replace(/<[^>]*>?/gm, '').slice(0, 160) : ''),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      publishedAt: postStatus === 'published' ? new Date().toISOString() : null
+    };
+
+    db.posts.unshift(newPost);
+
+    // Initialize metrics
+    const newMetric = {
+      id: nextId(db.post_metrics),
+      postId: newId,
+      views: 0,
+      uniqueVisitors: 0,
+      likes: 0,
+      shares: 0,
+      commentsCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    db.post_metrics.push(newMetric);
+    saveDB(db);
+
+    res.status(201).json(formatPostResponse(newPost, db));
+  };
+
+  router.post('/instructor/posts', handleCreateInstructorPost);
+  router.post('/instructor/blog', handleCreateInstructorPost);
+
+  // Instructor: Edit post (RBAC: ONLY own posts)
+  const handleUpdateInstructorPost = (req, res) => {
+    const db = loadDB();
+    const authCtx = requireInstructor(req, res, db);
+    if (!authCtx) return;
+
+    const id = Number(req.params.id);
+    const idx = (db.posts || []).findIndex(p => p.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Post not found.' });
+
+    const post = db.posts[idx];
+
+    // RBAC PERMISSION CHECK: Must be the author!
+    if (Number(post.authorId) !== Number(authCtx.instructorId) && !authCtx.isAdmin) {
+      return res.status(403).json({
+        error: 'Access denied: You can only edit blog posts that you authored yourself.'
+      });
+    }
+
+    const { title, slug, content, featuredImageUrl, status, category, excerpt } = req.body || {};
+    if (title !== undefined) post.title = title.trim();
+    if (slug !== undefined) post.slug = slug.trim();
+    if (content !== undefined) post.content = content;
+    if (featuredImageUrl !== undefined || req.body?.featured_image_url !== undefined) {
+      post.featuredImageUrl = featuredImageUrl || req.body?.featured_image_url || '';
+    }
+    if (category !== undefined) post.category = category;
+    if (excerpt !== undefined) post.excerpt = excerpt;
+    if (status !== undefined) {
+      post.status = status === 'draft' ? 'draft' : 'published';
+      if (post.status === 'published' && !post.publishedAt) {
+        post.publishedAt = new Date().toISOString();
+      }
+    }
+    post.updatedAt = new Date().toISOString();
+
+    saveDB(db);
+    res.json(formatPostResponse(post, db));
+  };
+
+  router.put('/instructor/posts/:id', handleUpdateInstructorPost);
+  router.put('/instructor/blog/:id', handleUpdateInstructorPost);
+
+  // Instructor: Delete post (RBAC: ONLY own posts)
+  const handleDeleteInstructorPost = (req, res) => {
+    const db = loadDB();
+    const authCtx = requireInstructor(req, res, db);
+    if (!authCtx) return;
+
+    const id = Number(req.params.id);
+    const post = (db.posts || []).find(p => p.id === id);
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+
+    // RBAC PERMISSION CHECK: Must be the author!
+    if (Number(post.authorId) !== Number(authCtx.instructorId) && !authCtx.isAdmin) {
+      return res.status(403).json({
+        error: 'Access denied: You can only delete blog posts that you authored yourself.'
+      });
+    }
+
+    db.posts = db.posts.filter(p => p.id !== id);
+    db.blog = db.posts;
+    if (db.post_metrics) db.post_metrics = db.post_metrics.filter(m => m.postId !== id);
+    if (db.post_comments) db.post_comments = db.post_comments.filter(c => c.postId !== id);
+    saveDB(db);
+
+    deleteFromSupabase('posts', id);
+    deleteFromSupabase('post_metrics', id);
+    res.json({ success: true });
+  };
+
+  router.delete('/instructor/posts/:id', handleDeleteInstructorPost);
+  router.delete('/instructor/blog/:id', handleDeleteInstructorPost);
+
+  // Instructor: View metrics (RBAC: ONLY own posts)
+  const handleGetInstructorPostMetrics = (req, res) => {
+    const db = loadDB();
+    const authCtx = requireInstructor(req, res, db);
+    if (!authCtx) return;
+
+    const id = Number(req.params.id);
+    const post = (db.posts || []).find(p => p.id === id);
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+
+    // RBAC PERMISSION CHECK: Must be the author!
+    if (Number(post.authorId) !== Number(authCtx.instructorId) && !authCtx.isAdmin) {
+      return res.status(403).json({
+        error: 'Access denied: You can only view metrics for blog posts that you authored yourself.'
+      });
+    }
+
+    const metrics = (db.post_metrics || []).find(m => m.postId === id) || {
+      postId: id,
+      views: 0,
+      uniqueVisitors: 0,
+      likes: 0,
+      shares: 0,
+      commentsCount: 0
+    };
+    const comments = (db.post_comments || []).filter(c => c.postId === id);
+
+    res.json({
+      post: {
+        id: post.id,
+        title: post.title,
+        slug: post.slug,
+        status: post.status
+      },
+      metrics,
+      comments
+    });
+  };
+
+  router.get('/instructor/posts/:id/metrics', handleGetInstructorPostMetrics);
+  router.get('/instructor/blog/:id/metrics', handleGetInstructorPostMetrics);
+
   // ─────────── ADMIN WORKSHOPS ───────────
 
   router.get('/admin/workshops', (req, res) => {
@@ -1818,39 +2360,179 @@ export function createApiRouter() {
     res.json({ success: true });
   });
 
-  // ─────────── ADMIN BLOG ───────────
+  // ─────────── ADMIN BLOG & POSTS (FULL PRIVILEGES) ───────────
+  // RBAC: Admins can create, edit, delete, and view metrics for ANY blog post.
 
-  router.get('/admin/blog', (req, res) => {
+  // Admin: Get all posts (draft and published) with metrics
+  const handleAdminGetPosts = (req, res) => {
     const db = loadDB();
-    res.json(db.blog);
-  });
+    const formatted = (db.posts || db.blog || []).map(p => formatPostResponse(p, db));
+    res.json(formatted);
+  };
 
-  router.post('/admin/blog', (req, res) => {
+  router.get('/admin/posts', handleAdminGetPosts);
+  router.get('/admin/blog', handleAdminGetPosts);
+
+  // Admin: Create post for ANY author
+  const handleAdminCreatePost = (req, res) => {
     const db = loadDB();
-    const post = { ...req.body, id: nextId(db.blog), publishedAt: new Date().toISOString().slice(0, 10) };
-    db.blog.unshift(post);
+    const { title, slug, content, featuredImageUrl, authorId, author, authorName, status, category, excerpt, publishedAt } = req.body || {};
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    db.posts = db.posts || [];
+    db.blog = db.posts;
+    db.post_metrics = db.post_metrics || [];
+
+    const newId = nextId(db.posts);
+    const postSlug = slug ? slug.trim() : slugify(title) + `-${newId}`;
+    const postStatus = (status === 'draft') ? 'draft' : 'published';
+
+    let resolvedAuthorId = authorId ? Number(authorId) : null;
+    let resolvedAuthorName = authorName || author || 'Godol Editorial';
+    let resolvedAuthorRole = 'admin';
+
+    if (resolvedAuthorId) {
+      const inst = (db.instructors || []).find(i => i.id === resolvedAuthorId);
+      if (inst) {
+        resolvedAuthorName = inst.name;
+        resolvedAuthorRole = 'instructor';
+      }
+    } else if (author && author !== 'Godol Editorial') {
+      const inst = (db.instructors || []).find(i => i.name.toLowerCase() === author.toLowerCase());
+      if (inst) {
+        resolvedAuthorId = inst.id;
+        resolvedAuthorRole = 'instructor';
+      }
+    }
+
+    const post = {
+      id: newId,
+      title: title.trim(),
+      slug: postSlug,
+      content: content || '',
+      featuredImageUrl: featuredImageUrl || req.body?.featured_image_url || '',
+      authorId: resolvedAuthorId || 1,
+      authorName: resolvedAuthorName,
+      authorRole: resolvedAuthorRole,
+      status: postStatus,
+      category: category || 'Business',
+      excerpt: excerpt || (content ? content.replace(/<[^>]*>?/gm, '').slice(0, 160) : ''),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      publishedAt: postStatus === 'published' ? (publishedAt || new Date().toISOString()) : null
+    };
+
+    db.posts.unshift(post);
+
+    // Initialize metrics
+    const newMetric = {
+      id: nextId(db.post_metrics),
+      postId: newId,
+      views: 0,
+      uniqueVisitors: 0,
+      likes: 0,
+      shares: 0,
+      commentsCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    db.post_metrics.push(newMetric);
+
     saveDB(db);
-    res.status(201).json(post);
-  });
+    res.status(201).json(formatPostResponse(post, db));
+  };
 
-  router.put('/admin/blog/:id', (req, res) => {
+  router.post('/admin/posts', handleAdminCreatePost);
+  router.post('/admin/blog', handleAdminCreatePost);
+
+  // Admin: Edit ANY post
+  const handleAdminUpdatePost = (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
-    const idx = db.blog.findIndex(p => p.id === id);
+    const idx = (db.posts || []).findIndex(p => p.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Post not found' });
-    db.blog[idx] = { ...db.blog[idx], ...req.body };
-    saveDB(db);
-    res.json(db.blog[idx]);
-  });
 
-  router.delete('/admin/blog/:id', (req, res) => {
+    const post = db.posts[idx];
+    const { title, slug, content, featuredImageUrl, authorId, author, authorName, status, category, excerpt, publishedAt } = req.body || {};
+
+    if (title !== undefined) post.title = title.trim();
+    if (slug !== undefined) post.slug = slug.trim();
+    if (content !== undefined) post.content = content;
+    if (featuredImageUrl !== undefined || req.body?.featured_image_url !== undefined) {
+      post.featuredImageUrl = featuredImageUrl || req.body?.featured_image_url || '';
+    }
+    if (authorId !== undefined) {
+      post.authorId = Number(authorId);
+      const inst = (db.instructors || []).find(i => i.id === post.authorId);
+      if (inst) {
+        post.authorName = inst.name;
+        post.authorRole = 'instructor';
+      }
+    } else if (author !== undefined || authorName !== undefined) {
+      post.authorName = authorName || author;
+    }
+    if (category !== undefined) post.category = category;
+    if (excerpt !== undefined) post.excerpt = excerpt;
+    if (status !== undefined) {
+      post.status = status === 'draft' ? 'draft' : 'published';
+      if (post.status === 'published' && !post.publishedAt) {
+        post.publishedAt = publishedAt || new Date().toISOString();
+      }
+    }
+    post.updatedAt = new Date().toISOString();
+
+    saveDB(db);
+    res.json(formatPostResponse(post, db));
+  };
+
+  router.put('/admin/posts/:id', handleAdminUpdatePost);
+  router.put('/admin/blog/:id', handleAdminUpdatePost);
+
+  // Admin: Delete ANY post
+  const handleAdminDeletePost = (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
-    db.blog = db.blog.filter(p => p.id !== id);
+    db.posts = (db.posts || []).filter(p => p.id !== id);
+    db.blog = db.posts;
+    if (db.post_metrics) db.post_metrics = db.post_metrics.filter(m => m.postId !== id);
+    if (db.post_comments) db.post_comments = db.post_comments.filter(c => c.postId !== id);
     saveDB(db);
+
+    deleteFromSupabase('posts', id);
+    deleteFromSupabase('post_metrics', id);
     deleteFromSupabase('blog_posts', id);
     res.json({ success: true });
-  });
+  };
+
+  router.delete('/admin/posts/:id', handleAdminDeletePost);
+  router.delete('/admin/blog/:id', handleAdminDeletePost);
+
+  // Admin: View metrics for ANY post
+  const handleAdminGetPostMetrics = (req, res) => {
+    const db = loadDB();
+    const id = Number(req.params.id);
+    const post = (db.posts || []).find(p => p.id === id);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const metrics = (db.post_metrics || []).find(m => m.postId === id) || {
+      postId: id,
+      views: 0,
+      uniqueVisitors: 0,
+      likes: 0,
+      shares: 0,
+      commentsCount: 0
+    };
+    const comments = (db.post_comments || []).filter(c => c.postId === id);
+
+    res.json({
+      post: formatPostResponse(post, db),
+      metrics,
+      comments
+    });
+  };
+
+  router.get('/admin/posts/:id/metrics', handleAdminGetPostMetrics);
+  router.get('/admin/blog/:id/metrics', handleAdminGetPostMetrics);
 
   // ─────────── ADMIN CERTIFICATES ───────────
 
