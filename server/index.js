@@ -1261,6 +1261,15 @@ export function createApiRouter() {
     const publishedCourses = db.courses.filter(c => c.status === 'published' && c.approvalStatus === 'approved').length;
     const pendingCourseApproval = db.courses.filter(c => c.approvalStatus === 'pending').length;
 
+    // Global Blog Metrics
+    const posts = db.posts || db.blog || [];
+    const postMetrics = db.post_metrics || [];
+    const totalBlogViews = postMetrics.reduce((sum, m) => sum + (m.views || 0), 0);
+    const totalBlogLikes = postMetrics.reduce((sum, m) => sum + (m.likes || 0), 0);
+    const totalBlogComments = postMetrics.reduce((sum, m) => sum + (m.commentsCount || 0), 0);
+    const totalBlogShares = postMetrics.reduce((sum, m) => sum + (m.shares || 0), 0);
+    const totalBlogInteractions = totalBlogLikes + totalBlogComments + totalBlogShares;
+
     res.json({
       totalStudents: db.students.length,
       totalCourses: db.courses.length,
@@ -1278,7 +1287,13 @@ export function createApiRouter() {
         ['pending_payment', 'pending_verification', 'pending_approval'].includes(e.enrollmentStatus)
       ).length,
       rejectedPayments: db.payments.filter(p => p.status === 'rejected').length,
-      approvedEnrollments
+      approvedEnrollments,
+      totalBlogPosts: posts.length,
+      publishedBlogPosts: posts.filter(p => p.status === 'published' || p.published).length,
+      totalBlogViews,
+      totalBlogInteractions,
+      totalBlogLikes,
+      totalBlogComments
     });
   });
 
