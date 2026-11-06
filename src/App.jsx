@@ -3,6 +3,7 @@ import { Switch, Route, Redirect, useLocation } from 'wouter';
 import Layout from './components/Layout';
 import ChatWidget from './components/ChatWidget';
 import ClerkAuthSync from './components/ClerkAuthSync';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Pages
 import Home from './pages/Home';
@@ -79,7 +80,8 @@ export default function App() {
     <>
       {hasClerk && <ClerkAuthSync />}
       <ScrollToTop />
-      <Switch>
+      <ErrorBoundary title="Page Error">
+        <Switch>
         {/* Public Routes */}
         <Route path="/">
           <Layout><Home /></Layout>
@@ -177,6 +179,7 @@ export default function App() {
           <Layout><NotFound /></Layout>
         </Route>
       </Switch>
+      </ErrorBoundary>
 
       <ChatWidget />
     </>

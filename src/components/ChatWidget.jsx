@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { MessageSquare, X, Send, MessageCircle } from 'lucide-react';
 
 const initialMessages = [
@@ -33,11 +34,17 @@ const answers = {
 const WHATSAPP_NUMBER = '252905139816';
 
 export default function ChatWidget() {
+  const [location] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState(initialMessages);
   const [inputText, setInputText] = useState('');
   const [hasUnread, setHasUnread] = useState(true);
   const messagesEndRef = useRef(null);
+
+  // Do not show the student advisory widget on admin or instructor portals
+  if (location.startsWith('/admin') || location.startsWith('/instructor')) {
+    return null;
+  }
 
   useEffect(() => {
     if (isOpen) setHasUnread(false);
@@ -84,9 +91,9 @@ export default function ChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 max-w-[calc(100vw-2rem)]">
       {isOpen && (
-        <div className="w-[340px] sm:w-[380px] rounded-2xl overflow-hidden shadow-2xl border border-border bg-card flex flex-col h-[500px] animate-in fade-in slide-in-from-bottom-5 duration-200">
+        <div className="w-[340px] sm:w-[380px] max-w-[calc(100vw-2rem)] rounded-2xl overflow-hidden shadow-2xl border border-border bg-card flex flex-col h-[500px] animate-in fade-in slide-in-from-bottom-5 duration-200">
           {/* Header */}
           <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-3">

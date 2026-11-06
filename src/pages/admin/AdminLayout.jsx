@@ -11,6 +11,7 @@ import { auth } from '../../lib/auth';
 import { apiFetch } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
 import ThemeToggleSwitch from '../../components/ThemeToggleSwitch';
+import ErrorBoundary from '../../components/ErrorBoundary';
 
 const adminNav = [
   { label: 'Overview', items: [
@@ -50,6 +51,17 @@ export default function AdminLayout({ children, title, subtitle }) {
   const [collapsedSections, setCollapsedSections] = useState({});
 
   useEffect(() => {
+    document.title = title ? `${title} | Godol Admin` : 'Admin | Godol';
+    let meta = document.querySelector('meta[name="robots"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'robots';
+      document.head.appendChild(meta);
+    }
+    meta.content = 'noindex, nofollow';
+  }, [title]);
+
+  useEffect(() => {
     const admin = auth.getAdmin();
     if (!admin) { setLocation('/admin'); return; }
     setAdminUser(admin.email || 'admin@godolinstitute.so');
@@ -69,15 +81,24 @@ export default function AdminLayout({ children, title, subtitle }) {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
-      {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[hsl(215,72%,14%)] text-white flex flex-col transform transition-transform duration-200 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 lg:flex`}>
+    <div className="min-h-screen bg-background text-foreground flex overflow-x-hidden">
+      {/* Sidebar Drawer */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[hsl(215,72%,14%)] text-white flex flex-col transform transition-transform duration-200 ease-in-out shadow-2xl lg:shadow-none ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 lg:flex flex-shrink-0`}>
         {/* Brand */}
-        <div className="px-5 py-5 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <img src="/godol-logo.png" alt="Godol" className="h-8 sm:h-9 max-w-[190px] w-auto brightness-0 invert object-contain" />
+        <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <img src="/godol-logo.png" alt="Godol" className="h-8 sm:h-9 max-w-[170px] w-auto brightness-0 invert object-contain" />
+            </div>
+            <div className="mt-1.5 text-[10px] text-white/40 font-semibold tracking-widest uppercase">Admin Console</div>
           </div>
-          <div className="mt-1.5 text-[10px] text-white/40 font-semibold tracking-widest uppercase">Admin Console</div>
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="lg:hidden p-1.5 text-white/60 hover:text-white rounded-lg hover:bg-white/10 transition-colors"
+            aria-label="Close sidebar"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -134,41 +155,53 @@ export default function AdminLayout({ children, title, subtitle }) {
 
       {/* Mobile backdrop */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 max-w-full overflow-x-hidden">
         {/* Top header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4 sticky top-0 z-30">
-          <button className="lg:hidden p-1.5 -ml-1 text-gray-600 hover:text-gray-900"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+        <header className="bg-card border-b border-border px-3 sm:px-6 py-3 sm:py-4 flex items-center gap-2 sm:gap-4 sticky top-0 z-30 shadow-xs">
+          <button
+            className="lg:hidden p-2 text-foreground/70 hover:text-foreground rounded-lg hover:bg-muted transition-colors flex-shrink-0"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Open sidebar navigation"
+          >
             {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-gray-900">{title}</h1>
-            {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base sm:text-xl font-bold text-foreground truncate">{title}</h1>
+            {subtitle && <p className="text-xs text-muted-foreground mt-0.5 truncate hidden sm:block">{subtitle}</p>}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <ThemeToggleSwitch />
             {pendingCount > 0 && (
               <Link href="/admin/payments"
-                className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors">
+                className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60 px-2.5 sm:px-3 py-1.5 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-colors">
                 <AlertCircle className="w-3.5 h-3.5" />
-                {pendingCount} pending
+                <span className="hidden xs:inline">{pendingCount} pending</span>
+                <span className="xs:hidden">{pendingCount}</span>
               </Link>
             )}
             <Link href="/" target="_blank"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline bg-primary/5 px-3 py-1.5 rounded-lg border border-primary/15">
-              <span>View Site</span>
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline bg-primary/10 px-2.5 sm:px-3 py-1.5 rounded-lg border border-primary/20">
+              <span className="hidden sm:inline">View Site</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </Link>
           </div>
         </header>
 
-        <main className="flex-1 p-6 md:p-8 overflow-auto">{children}</main>
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 overflow-x-hidden min-w-0 max-w-full">
+          <ErrorBoundary title={`${title || 'Admin Section'} Error`}>
+            {children}
+          </ErrorBoundary>
+        </main>
       </div>
     </div>
   );

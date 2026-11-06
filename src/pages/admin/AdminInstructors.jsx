@@ -3,7 +3,8 @@ import {
   Plus, Edit2, Trash2, Search, X, Upload, Check,
   Key, Eye, EyeOff, Copy, ExternalLink, ShieldCheck, Mail, Phone,
   Sparkles, Users, BookOpen, MessageSquare, Send, CheckCircle2,
-  FileText, Award, AlertCircle, Clock, ChevronRight, UserCheck
+  FileText, Award, AlertCircle, Clock, ChevronRight, UserCheck,
+  RefreshCw
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
@@ -31,6 +32,8 @@ export default function AdminInstructors() {
   const [activeTab, setActiveTab] = useState('instructors'); // 'instructors' | 'applications'
   const [searchFilter, setSearchFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,10 +82,34 @@ export default function AdminInstructors() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const loadAll = () => {
-    apiFetch('/api/admin/instructors').then(setInstructors).catch(console.error);
-    apiFetch('/api/admin/instructor-applications').then(setApplications).catch(() => {});
-    apiFetch('/api/categories').then(setCategories).catch(() => {});
+  const loadAll = async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const [instRes, appRes, catRes] = await Promise.allSettled([
+        apiFetch('/api/admin/instructors'),
+        apiFetch('/api/admin/instructor-applications'),
+        apiFetch('/api/categories')
+      ]);
+
+      if (instRes.status === 'fulfilled' && Array.isArray(instRes.value)) {
+        setInstructors(instRes.value);
+      } else if (instRes.status === 'fulfilled' && instRes.value && Array.isArray(instRes.value.instructors)) {
+        setInstructors(instRes.value.instructors);
+      } else {
+        console.warn('Instructors fetch returned non-array:', instRes);
+        setInstructors([]);
+        setErrorMessage("Couldn't load instructors list. Please retry.");
+      }
+
+      setApplications(appRes.status === 'fulfilled' && Array.isArray(appRes.value) ? appRes.value : []);
+      setCategories(catRes.status === 'fulfilled' && Array.isArray(catRes.value) ? catRes.value : []);
+    } catch (err) {
+      console.error('loadAll error:', err);
+      setErrorMessage(err.message || "Couldn't load instructors.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -294,9 +321,13 @@ export default function AdminInstructors() {
     }
   };
 
-  const pendingApps = applications.filter(a => a.status === 'pending_verification');
+  const safeInstructors = Array.isArray(instructors) ? instructors : [];
+  const safeApplications = Array.isArray(applications) ? applications : [];
 
-  const filtered = instructors.filter(i => {
+  const pendingApps = safeApplications.filter(a => a && a.status === 'pending_verification');
+
+  const filtered = safeInstructors.filter(i => {
+    if (!i) return false;
     const matchesSearch =
       !searchFilter ||
       i.name?.toLowerCase().includes(searchFilter.toLowerCase()) ||
@@ -321,6 +352,23 @@ export default function AdminInstructors() {
           </div>
         )}
 
+        {/* Error Alert with Retry */}
+        {errorMessage && (
+          <div className="p-4 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-between gap-3 text-red-900 text-xs sm:text-sm shadow-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+              <span className="font-semibold truncate">{errorMessage}</span>
+            </div>
+            <button
+              onClick={loadAll}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors flex-shrink-0"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Retry</span>
+            </button>
+          </div>
+        )}
+
         {/* 4 Stat Overview Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
@@ -328,7 +376,7 @@ export default function AdminInstructors() {
               <span className="text-xs font-medium">Total Instructors</span>
               <Users className="w-4 h-4 text-primary" />
             </div>
-            <div className="text-2xl font-serif font-bold text-gray-900">{instructors.length}</div>
+            <div className="text-2xl font-serif font-bold text-gray-900">{safeInstructors.length}</div>
             <div className="text-[11px] text-gray-400 mt-0.5">Faculty profiles</div>
           </div>
 
@@ -338,7 +386,7 @@ export default function AdminInstructors() {
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
             </div>
             <div className="text-2xl font-serif font-bold text-gray-900">
-              {instructors.filter(i => i.status !== 'suspended').length}
+              {safeInstructors.filter(i => i.status !== 'suspended').length}
             </div>
             <div className="text-[11px] text-emerald-600 font-semibold mt-0.5">Active on website</div>
           </div>
@@ -363,7 +411,7 @@ export default function AdminInstructors() {
               <BookOpen className="w-4 h-4 text-blue-600" />
             </div>
             <div className="text-2xl font-serif font-bold text-gray-900">
-              {instructors.reduce((acc, i) => acc + (i.courseCount || 0), 0)}
+              {safeInstructors.reduce((acc, i) => acc + (i.courseCount || 0), 0)}
             </div>
             <div className="text-[11px] text-gray-400 mt-0.5">Curriculum taught</div>
           </div>
@@ -452,9 +500,60 @@ export default function AdminInstructors() {
               </div>
             </div>
 
-            {/* Instructor Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filtered.map((inst) => (
+            {/* Instructor Cards / Skeleton / Empty State */}
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+                {[1, 2, 3].map(n => (
+                  <div key={n} className="bg-white border border-gray-200 rounded-3xl p-6 h-72 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="h-5 w-24 bg-gray-200 rounded-full"></div>
+                      <div className="h-5 w-12 bg-gray-200 rounded"></div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 rounded-2xl bg-gray-200"></div>
+                      <div className="space-y-2 flex-1">
+                        <div className="h-4 w-3/4 bg-gray-200 rounded"></div>
+                        <div className="h-3 w-1/2 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                    <div className="h-10 bg-gray-100 rounded-xl"></div>
+                    <div className="h-8 bg-gray-100 rounded-xl"></div>
+                  </div>
+                ))}
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="bg-white border border-dashed border-gray-300 rounded-3xl p-10 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary mx-auto flex items-center justify-center mb-4">
+                  <Users className="w-7 h-7" />
+                </div>
+                <h3 className="font-bold text-base text-gray-900 mb-1">
+                  {searchFilter ? 'No matching instructors found' : 'No instructors registered yet'}
+                </h3>
+                <p className="text-xs text-gray-500 max-w-sm mx-auto mb-6">
+                  {searchFilter
+                    ? 'Try refining your search keyword or clearing the status filter.'
+                    : 'Get started by creating your first faculty member. They will receive automated credentials for the Faculty Portal.'}
+                </p>
+                {searchFilter ? (
+                  <button
+                    onClick={() => { setSearchFilter(''); setStatusFilter('all'); }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-200 transition-colors"
+                  >
+                    <span>Clear Search</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleOpenAdd}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Instructor Manually</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filtered.map((inst) => (
                 <div
                   key={inst.id}
                   className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all flex flex-col justify-between relative overflow-hidden"
@@ -646,6 +745,7 @@ export default function AdminInstructors() {
                 </div>
               ))}
             </div>
+            )}
           </div>
         )}
 

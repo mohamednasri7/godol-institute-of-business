@@ -13,18 +13,18 @@ import { apiFetch } from '../../lib/api';
 
 function StatCard({ label, value, sub, icon: Icon, color, linkTo }) {
   const card = (
-    <div className={`bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow ${linkTo ? 'cursor-pointer' : ''}`}>
-      <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{label}</p>
-        <div className="text-2xl font-bold text-gray-900 mb-1">{value}</div>
-        {sub && <p className="text-xs text-gray-500">{sub}</p>}
+    <div className={`bg-white dark:bg-card border border-gray-200 dark:border-border rounded-2xl p-5 sm:p-6 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow h-full ${linkTo ? 'cursor-pointer' : ''}`}>
+      <div className="min-w-0 pr-3">
+        <p className="text-xs font-semibold text-gray-500 dark:text-muted-foreground uppercase tracking-wider mb-1 truncate">{label}</p>
+        <div className="text-2xl font-bold text-gray-900 dark:text-foreground mb-1">{value}</div>
+        {sub && <p className="text-xs text-gray-500 dark:text-muted-foreground truncate">{sub}</p>}
       </div>
       <div className={`w-12 h-12 rounded-2xl ${color} text-white flex items-center justify-center shadow-md flex-shrink-0`}>
         <Icon className="w-6 h-6" />
       </div>
     </div>
   );
-  return linkTo ? <Link href={linkTo}>{card}</Link> : card;
+  return linkTo ? <Link href={linkTo} className="block h-full">{card}</Link> : card;
 }
 
 const defaultPostForm = {
@@ -48,6 +48,7 @@ export default function AdminDashboard() {
   const [posts, setPosts] = useState([]);
   const [instructors, setInstructors] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
 
   // Global Blog Management state
@@ -61,25 +62,50 @@ export default function AdminDashboard() {
   const [isSavingPost, setIsSavingPost] = useState(false);
   const fileInputRef = useRef(null);
 
-  const fetchData = () => {
+  const fetchData = async () => {
     setIsLoading(true);
-    Promise.all([
-      apiFetch('/api/admin/stats'),
-      apiFetch('/api/admin/payments?status=pending_verification'),
-      apiFetch('/api/admin/enrollments'),
-      apiFetch('/api/admin/enquiries').catch(() => []),
-      apiFetch('/api/admin/posts').catch(() => apiFetch('/api/admin/blog').catch(() => [])),
-      apiFetch('/api/admin/instructors').catch(() => [])
-    ]).then(([s, pays, enrs, inqs, psts, insts]) => {
-      setStats(s);
+    setErrorMessage(null);
+    try {
+      const [sRes, paysRes, enrsRes, inqsRes, pstsRes, instsRes] = await Promise.allSettled([
+        apiFetch('/api/admin/stats'),
+        apiFetch('/api/admin/payments?status=pending_verification'),
+        apiFetch('/api/admin/enrollments'),
+        apiFetch('/api/admin/enquiries'),
+        apiFetch('/api/admin/posts').catch(() => apiFetch('/api/admin/blog')),
+        apiFetch('/api/admin/instructors')
+      ]);
+
+      if (sRes.status === 'fulfilled' && sRes.value && typeof sRes.value === 'object') {
+        setStats(sRes.value);
+      } else {
+        console.warn('Dashboard stats failed to load:', sRes.reason);
+        setErrorMessage("Couldn't load complete metrics from the server. Click Retry to re-fetch.");
+      }
+
+      const pays = paysRes.status === 'fulfilled' && Array.isArray(paysRes.value) ? paysRes.value : [];
+      const enrs = enrsRes.status === 'fulfilled' && Array.isArray(enrsRes.value) ? enrsRes.value : [];
+      const inqs = inqsRes.status === 'fulfilled' && Array.isArray(inqsRes.value) ? inqsRes.value : [];
+      const psts = pstsRes.status === 'fulfilled' && Array.isArray(pstsRes.value) ? pstsRes.value : [];
+      const insts = instsRes.status === 'fulfilled' && Array.isArray(instsRes.value) ? instsRes.value : [];
+
       setRecentPayments(pays.slice(0, 5));
       setRecentEnrollments(enrs.slice(0, 6));
-      setRecentInquiries((inqs || []).slice(0, 5));
-      setPosts(Array.isArray(psts) ? psts : []);
-      setInstructors(Array.isArray(insts) ? insts : []);
+      setRecentInquiries(inqs.slice(0, 5));
+      setPosts(psts);
+      setInstructors(insts);
       setLastRefreshed(new Date());
-    }).catch(console.error)
-      .finally(() => setIsLoading(false));
+    } catch (err) {
+      console.error('fetchData error:', err);
+      setErrorMessage(err.message || "Couldn't load dashboard data.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const safeDate = (val) => {
+    if (!val) return '—';
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
   };
 
   const handleDeleteInquiry = async (id) => {
@@ -306,7 +332,7 @@ export default function AdminDashboard() {
 
   return (
     <AdminLayout title="Dashboard Overview" subtitle="Real-time platform analytics, global blog oversight, and management controls">
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         {/* Refresh Header */}
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-400">Last updated: {lastRefreshed.toLocaleTimeString()}</p>
@@ -315,6 +341,23 @@ export default function AdminDashboard() {
             Refresh
           </button>
         </div>
+
+        {/* Error Alert with Retry */}
+        {errorMessage && (
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-3 text-amber-900 text-xs sm:text-sm shadow-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+              <span className="font-semibold truncate">{errorMessage}</span>
+            </div>
+            <button
+              onClick={fetchData}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition-colors flex-shrink-0"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Retry</span>
+            </button>
+          </div>
+        )}
 
         {/* Pending alert banner */}
         {stats?.pendingVerification > 0 && (
@@ -334,7 +377,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Metric Cards Row 1 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           <StatCard label="Verified Revenue" value={fmtUSD(stats?.verifiedRevenue)} sub="Confirmed payments only" icon={DollarSign} color="bg-emerald-600" linkTo="/admin/revenue" />
           <StatCard label="Revenue This Month" value={fmtUSD(stats?.revenueThisMonth)} sub="Verified this calendar month" icon={TrendingUp} color="bg-blue-600" linkTo="/admin/revenue" />
           <StatCard label="Total Students" value={fmt(stats?.totalStudents)} sub="Registered accounts" icon={Users} color="bg-indigo-600" linkTo="/admin/students" />
@@ -342,7 +385,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Metric Cards Row 2 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           <StatCard label="Total Courses" value={fmt(stats?.totalCourses)} sub={`${fmt(stats?.publishedCourses)} published`} icon={BookOpen} color="bg-purple-600" linkTo="/admin/courses" />
           <StatCard label="Active Enrollments" value={fmt(stats?.activeEnrollments)} sub="Students with course access" icon={ClipboardList} color="bg-cyan-600" linkTo="/admin/enrollments" />
           <StatCard label="Total Instructors" value={fmt(stats?.totalInstructors)} sub="Faculty members" icon={Users} color="bg-pink-600" linkTo="/admin/instructors" />
@@ -350,8 +393,8 @@ export default function AdminDashboard() {
         </div>
 
         {/* ─────────── 1. GLOBAL BLOG ANALYTICS WIDGET ─────────── */}
-        <div className="bg-gradient-to-br from-gray-900 via-primary/95 to-slate-900 rounded-3xl p-6 md:p-8 text-white shadow-xl">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div className="bg-gradient-to-br from-gray-900 via-primary/95 to-slate-900 rounded-2xl p-5 sm:p-6 text-white shadow-lg">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
               <div className="flex items-center gap-2.5 mb-1.5">
                 <span className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-amber-400 border border-white/15">
@@ -667,7 +710,7 @@ export default function AdminDashboard() {
                         </td>
 
                         <td className="py-4 px-4 text-gray-500 text-[11px]">
-                          {post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : '—'}
+                          {safeDate(post.publishedAt)}
                         </td>
 
                         <td className="py-4 px-6 text-right">
@@ -821,7 +864,7 @@ export default function AdminDashboard() {
                     <td className="py-3.5 px-6 text-gray-600 truncate max-w-[200px]">{e.courseTitle}</td>
                     <td className="py-3.5 px-6 font-bold">${e.coursePrice || 0}</td>
                     <td className="py-3.5 px-6">{statusBadge(e.enrollmentStatus)}</td>
-                    <td className="py-3.5 px-6 text-gray-400">{new Date(e.enrolledAt).toLocaleDateString()}</td>
+                    <td className="py-3.5 px-6 text-gray-400">{safeDate(e.enrolledAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -861,7 +904,7 @@ export default function AdminDashboard() {
                       </td>
                       <td className="py-3.5 px-6 text-gray-800 font-medium truncate max-w-[180px]">{inq.subject}</td>
                       <td className="py-3.5 px-6 text-gray-600 line-clamp-1 max-w-[280px]">{inq.message}</td>
-                      <td className="py-3.5 px-6 text-gray-400">{new Date(inq.createdAt).toLocaleDateString()}</td>
+                      <td className="py-3.5 px-6 text-gray-400">{safeDate(inq.createdAt)}</td>
                       <td className="py-3.5 px-6 text-right">
                         <button
                           onClick={() => handleDeleteInquiry(inq.id)}
