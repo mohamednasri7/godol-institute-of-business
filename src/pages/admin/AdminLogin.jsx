@@ -26,9 +26,7 @@ export default function AdminLogin() {
       auth.setAdmin(res.token, res.email);
       setLocation('/admin/dashboard');
     } catch (err) {
-      // Fallback local accept if needed
-      auth.setAdmin('mock_token', email);
-      setLocation('/admin/dashboard');
+      setErrorMessage(err.message || 'Invalid credentials. Access denied.');
     } finally {
       setIsLoading(false);
     }

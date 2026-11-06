@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
+import { supabase, isSupabaseClientConfigured } from '../../lib/supabase';
 
 function StatCard({ label, value, sub, icon: Icon, color, linkTo }) {
   const card = (
@@ -49,6 +50,7 @@ export default function AdminDashboard() {
   const [instructors, setInstructors] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [isRealtimeActive, setIsRealtimeActive] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
 
   // Global Blog Management state
@@ -117,6 +119,34 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchData();
+
+    if (!isSupabaseClientConfigured || !supabase) return;
+
+    // Supabase Realtime Subscription: auto-syncs dashboard whenever student registers, enrolls, or submits payment
+    const channel = supabase
+      .channel('admin-dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'enrollments' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'courses' }, () => {
+        fetchData();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        fetchData();
+      })
+      .subscribe((status) => {
+        setIsRealtimeActive(status === 'SUBSCRIBED');
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fmt = (n) => Number(n || 0).toLocaleString();
@@ -333,10 +363,20 @@ export default function AdminDashboard() {
   return (
     <AdminLayout title="Dashboard Overview" subtitle="Real-time platform analytics, global blog oversight, and management controls">
       <div className="space-y-6 sm:space-y-8">
-        {/* Refresh Header */}
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-400">Last updated: {lastRefreshed.toLocaleTimeString()}</p>
-          <button onClick={fetchData} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary transition-colors">
+        {/* Refresh Header & Realtime Sync Indicator */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
+              isRealtimeActive
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                : 'bg-gray-100 text-gray-500'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isRealtimeActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}></span>
+              <span>{isRealtimeActive ? 'Realtime Live Sync Active' : 'Polling Sync'}</span>
+            </span>
+            <p className="text-xs text-gray-400">Updated: {lastRefreshed.toLocaleTimeString()}</p>
+          </div>
+          <button onClick={fetchData} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary transition-colors self-start sm:self-auto">
             <RefreshCw className="w-3.5 h-3.5" />
             Refresh
           </button>

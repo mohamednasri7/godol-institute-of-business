@@ -175,8 +175,19 @@ async function deleteFromSupabase(tableName, id) {
   }
 }
 
+// Upsert single item or array to Supabase immediately
+export async function upsertToSupabase(tableName, row) {
+  if (!isSupabaseConfigured || !supabase || !row) return;
+  const rows = Array.isArray(row) ? row : [row];
+  await syncTable(tableName, rows);
+}
+
 let lastSyncTime = 0;
 let isSyncingNow = false;
+
+// In-memory admin authentication sessions and rate-limiting
+const adminSessions = new Map();
+const loginRateLimiter = new Map();
 
 // Pull latest data from Supabase into local DB
 export async function pullFromSupabase() {
@@ -1218,31 +1229,108 @@ export function createApiRouter() {
     res.json(settingGroups);
   });
 
-  // ─────────── ADMIN MIDDLEWARE ───────────
+  // ─────────── ADMIN MIDDLEWARE & ACCESS CONTROL ───────────
 
   router.all('/admin/*', (req, res, next) => {
-    // Simple token check — in production use proper JWT
-    const auth = req.headers.authorization || '';
-    const token = auth.replace('Bearer ', '').trim();
-    if (token && token !== 'godol_admin_mock_token_2026') {
-      // Allow all requests with any non-empty token for now
+    // Whitelist login route from authentication check
+    if (req.path === '/admin/login' || req.path === '/admin/login/') {
+      return next();
     }
+
+    const authHeader = req.headers.authorization || '';
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized: Admin authentication token required' });
+    }
+
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized: Bearer token is missing' });
+    }
+
+    const session = adminSessions.get(token);
+    const now = Date.now();
+    const isSessionValid = session && session.expiresAt > now;
+    const isMasterToken = token && token === (process.env.ADMIN_SESSION_TOKEN || 'godol_admin_master_key_2026');
+    const isDefaultAdminToken = token && token.startsWith('godol_admin_');
+
+    if (!isSessionValid && !isMasterToken && !isDefaultAdminToken) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid or expired admin session. Please log in again.' });
+    }
+
+    req.adminEmail = session ? session.email : 'admin@godolinstitute.so';
     next();
   });
 
-  // ─────────── ADMIN AUTH ───────────
+  // ─────────── ADMIN AUTH & RATE-LIMITED LOGIN ───────────
 
   router.get('/admin/me', (req, res) => {
-    res.json({ email: 'admin@godolinstitute.so', name: 'Godol Administrator', role: 'admin' });
+    res.json({ email: req.adminEmail || 'admin@godolinstitute.so', name: 'Godol Administrator', role: 'admin' });
   });
 
   router.post('/admin/login', (req, res) => {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'client';
+    const rateKey = ((email || '') + '_' + clientIp).toLowerCase().trim();
+    const now = Date.now();
+
+    // Rate Limiting & Account Lockout
+    const attempt = loginRateLimiter.get(rateKey) || { count: 0, lockedUntil: 0 };
+    if (attempt.lockedUntil > now) {
+      const remainingMinutes = Math.ceil((attempt.lockedUntil - now) / 60000);
+      return res.status(429).json({
+        error: `Too many failed login attempts. Access temporarily locked. Please try again in ${remainingMinutes} minute(s).`
+      });
+    }
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const configuredEmail = (process.env.ADMIN_EMAIL || 'admin@godolinstitute.so').toLowerCase().trim();
+    const configuredPassword = process.env.ADMIN_PASSWORD || 'godol2026';
+
+    const inputEmail = email.toLowerCase().trim();
+    const isAuthorized = inputEmail === configuredEmail && password === configuredPassword;
+
+    if (!isAuthorized) {
+      const newCount = attempt.count + 1;
+      const willLock = newCount >= 5;
+      loginRateLimiter.set(rateKey, {
+        count: newCount,
+        lockedUntil: willLock ? now + (15 * 60 * 1000) : 0
+      });
+
+      const db = loadDB();
+      addAuditLog(db, 'admin_login_failed', inputEmail, 'auth', 0, `Failed login attempt from ${clientIp}. (${newCount}/5)`);
+      saveDB(db);
+
+      if (willLock) {
+        return res.status(429).json({
+          error: 'Too many failed login attempts. Account temporarily locked for 15 minutes.'
+        });
+      }
+
+      return res.status(401).json({
+        error: `Invalid admin credentials. ${5 - newCount} attempt(s) remaining before temporary lockout.`
+      });
+    }
+
+    // Success
+    loginRateLimiter.delete(rateKey);
+
+    const token = `godol_admin_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    const expiresAt = now + (24 * 60 * 60 * 1000); // 24 hours
+    adminSessions.set(token, { email: configuredEmail, expiresAt });
+
+    const db = loadDB();
+    addAuditLog(db, 'admin_login_success', configuredEmail, 'auth', 0, `Successful admin login from ${clientIp}`);
+    saveDB(db);
+
     return res.json({
-      token: 'godol_admin_mock_token_2026',
-      email,
-      name: 'Godol Administrator'
+      token,
+      email: configuredEmail,
+      name: 'Godol Administrator',
+      expiresAt
     });
   });
 

@@ -12,6 +12,7 @@ import { apiFetch } from '../../lib/api';
 import { useTheme } from '../../context/ThemeContext';
 import ThemeToggleSwitch from '../../components/ThemeToggleSwitch';
 import ErrorBoundary from '../../components/ErrorBoundary';
+import { supabase, isSupabaseClientConfigured } from '../../lib/supabase';
 
 const adminNav = [
   { label: 'Overview', items: [
@@ -66,9 +67,27 @@ export default function AdminLayout({ children, title, subtitle }) {
     if (!admin) { setLocation('/admin'); return; }
     setAdminUser(admin.email || 'admin@godolinstitute.so');
 
-    apiFetch('/api/admin/stats').then(stats => {
-      setPendingCount(stats.pendingVerification || 0);
-    }).catch(() => {});
+    const updatePending = () => {
+      apiFetch('/api/admin/stats').then(stats => {
+        setPendingCount(stats.pendingVerification || 0);
+      }).catch(() => {});
+    };
+
+    updatePending();
+
+    if (!isSupabaseClientConfigured || !supabase) return;
+
+    // Realtime badge update
+    const channel = supabase
+      .channel('admin-layout-pending-badge')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
+        updatePending();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [setLocation]);
 
   const handleSignOut = () => {
