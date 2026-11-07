@@ -76,11 +76,15 @@ export default function AdminCourses() {
 
   const handleSave = async () => {
     try {
+      const payload = {
+        ...form,
+        approvalStatus: form.status === 'published' ? 'approved' : (form.approvalStatus || 'pending')
+      };
       if (editingCourse) {
-        await apiFetch(`/api/admin/courses/${editingCourse.id}`, { method: 'PUT', body: JSON.stringify(form) });
+        await apiFetch(`/api/admin/courses/${editingCourse.id}`, { method: 'PUT', body: JSON.stringify(payload) });
         showToast('Course updated.');
       } else {
-        await apiFetch('/api/admin/courses', { method: 'POST', body: JSON.stringify(form) });
+        await apiFetch('/api/admin/courses', { method: 'POST', body: JSON.stringify(payload) });
         showToast('Course created.');
       }
       setShowModal(false);
@@ -131,7 +135,11 @@ export default function AdminCourses() {
 
   const togglePublish = async (course) => {
     const newStatus = course.status === 'published' ? 'draft' : 'published';
-    await apiFetch(`/api/admin/courses/${course.id}`, { method: 'PUT', body: JSON.stringify({ status: newStatus }) });
+    const newApproval = newStatus === 'published' ? 'approved' : course.approvalStatus;
+    await apiFetch(`/api/admin/courses/${course.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: newStatus, approvalStatus: newApproval })
+    });
     fetchCourses();
   };
 

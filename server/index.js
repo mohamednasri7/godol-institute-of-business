@@ -157,30 +157,97 @@ async function syncTable(tableName, rows) {
     const conflictKey = tableName === 'platform_settings' ? 'key' : 'id';
     const { error } = await supabase.from(tableName).upsert(snakeRows, { onConflict: conflictKey });
     if (error) {
-      console.error(`Supabase sync error for ${tableName}:`, error.message);
+      console.warn(`Supabase sync warning for ${tableName}:`, error.message);
     }
   } catch (err) {
-    console.error(`Supabase sync error for ${tableName}:`, err.message);
+    console.warn(`Supabase sync exception for ${tableName}:`, err.message);
   }
 }
 
 // Delete item from Supabase
-async function deleteFromSupabase(tableName, id) {
+export async function deleteFromSupabase(tableName, id) {
   if (!isSupabaseConfigured || !supabase) return;
   try {
     const { error } = await supabase.from(tableName).delete().eq('id', id);
-    if (error) console.error(`Supabase delete error for ${tableName} id=${id}:`, error.message);
+    if (error) console.warn(`Supabase delete error for ${tableName} id=${id}:`, error.message);
   } catch (err) {
-    console.error(`Supabase delete error for ${tableName} id=${id}:`, err.message);
+    console.warn(`Supabase delete error for ${tableName} id=${id}:`, err.message);
   }
 }
 
-// Upsert single item or array to Supabase immediately
-export async function upsertToSupabase(tableName, row) {
-  if (!isSupabaseConfigured || !supabase || !row) return;
-  const rows = Array.isArray(row) ? row : [row];
-  await syncTable(tableName, rows);
+// Delete post from all Supabase blog tables
+export async function deletePostFromSupabase(id) {
+  if (!isSupabaseConfigured || !supabase) return;
+  try {
+    await supabase.from('blog_posts').delete().eq('id', id);
+  } catch (err) {}
+  try {
+    await supabase.from('posts').delete().eq('id', id);
+  } catch (err) {}
+  try {
+    await supabase.from('post_metrics').delete().eq('post_id', id);
+  } catch (err) {}
+  try {
+    await supabase.from('post_comments').delete().eq('post_id', id);
+  } catch (err) {}
 }
+
+// Upsert single item to Supabase immediately (awaited for serverless resilience)
+export async function syncRecordToSupabase(tableName, record) {
+  if (!isSupabaseConfigured || !supabase || !record) return;
+  try {
+    const snake = rowToSnake(record, tableName);
+    const conflictKey = tableName === 'platform_settings' ? 'key' : 'id';
+    const { error } = await supabase.from(tableName).upsert([snake], { onConflict: conflictKey });
+    if (error) {
+      console.warn(`Supabase syncRecord warning for ${tableName}:`, error.message);
+    }
+  } catch (err) {
+    console.warn(`Supabase syncRecord exception for ${tableName}:`, err.message);
+  }
+}
+
+// Dedicated post upsert ensuring both blog_posts and posts tables stay in sync
+export async function syncPostToSupabase(post) {
+  if (!isSupabaseConfigured || !supabase || !post) return;
+  // 1. Live Supabase blog_posts table sync
+  try {
+    const isPub = post.status === 'published' || post.published === true;
+    const blogRow = {
+      id: post.id,
+      title: post.title,
+      slug: post.slug || `article-${post.id}`,
+      excerpt: post.excerpt || '',
+      content: post.content || '',
+      category: post.category || 'Business',
+      author: post.authorName || post.author || 'Godol Editorial',
+      read_time: post.readTime || post.read_time || '5 min read',
+      published: isPub,
+      featured: Boolean(post.featured),
+      published_at: post.publishedAt ? post.publishedAt.split('T')[0] : (isPub ? new Date().toISOString().split('T')[0] : null)
+    };
+    const { error: bErr } = await supabase.from('blog_posts').upsert([blogRow], { onConflict: 'id' });
+    if (bErr) console.warn('Supabase blog_posts upsert note:', bErr.message);
+  } catch (err) {
+    console.warn('Supabase blog_posts exception:', err.message);
+  }
+
+  // 2. Also upsert to posts table if present in schema
+  try {
+    const postSnake = rowToSnake(post, 'posts');
+    const { error: pErr } = await supabase.from('posts').upsert([postSnake], { onConflict: 'id' });
+    if (!pErr) {
+      const metric = (loadDB().post_metrics || []).find(m => m.postId === post.id);
+      if (metric) {
+        await supabase.from('post_metrics').upsert([rowToSnake(metric, 'post_metrics')], { onConflict: 'post_id' });
+      }
+    }
+  } catch (err) {
+    // If posts table is not yet migrated, silently ignore
+  }
+}
+
+export const upsertToSupabase = syncRecordToSupabase;
 
 let lastSyncTime = 0;
 let isSyncingNow = false;
@@ -198,6 +265,9 @@ export async function pullFromSupabase() {
 
     const currentDb = loadDB();
     for (const [localKey, supabaseTable] of Object.entries(LOCAL_TO_SUPABASE)) {
+      // Handle posts specially below
+      if (localKey === 'posts' || localKey === 'blog' || localKey === 'post_metrics' || localKey === 'post_comments') continue;
+
       const { data, error } = await supabase.from(supabaseTable).select('*');
       if (!error && Array.isArray(data)) {
         if (localKey === 'instructors') {
@@ -219,6 +289,68 @@ export async function pullFromSupabase() {
         updated = true;
       }
     }
+
+    // Pull blog posts (first check 'posts' table, fall back to 'blog_posts')
+    let postsLoaded = false;
+    const { data: postsData, error: postsErr } = await supabase.from('posts').select('*');
+    if (!postsErr && Array.isArray(postsData) && postsData.length > 0) {
+      db.posts = postsData.map(rowToCamel);
+      db.blog = db.posts;
+      postsLoaded = true;
+      updated = true;
+      // Also pull metrics if posts table exists
+      const { data: metricsData } = await supabase.from('post_metrics').select('*');
+      if (Array.isArray(metricsData)) db.post_metrics = metricsData.map(rowToCamel);
+    }
+
+    if (!postsLoaded) {
+      const { data: blogData, error: blogErr } = await supabase.from('blog_posts').select('*');
+      if (!blogErr && Array.isArray(blogData) && blogData.length > 0) {
+        const mappedBlog = blogData.map(b => ({
+          id: b.id,
+          title: b.title || 'Untitled Article',
+          slug: b.slug || `article-${b.id}`,
+          content: b.content || '',
+          excerpt: b.excerpt || '',
+          category: b.category || 'Business',
+          authorId: 1,
+          authorName: b.author || 'Godol Editorial',
+          author: b.author || 'Godol Editorial',
+          authorRole: 'admin',
+          status: b.published ? 'published' : 'draft',
+          published: Boolean(b.published),
+          featured: Boolean(b.featured),
+          readTime: b.read_time || '5 min read',
+          createdAt: b.published_at || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          publishedAt: b.published_at || new Date().toISOString()
+        }));
+        db.posts = mappedBlog;
+        db.blog = mappedBlog;
+        updated = true;
+      }
+    }
+
+    // Ensure every post has an entry in post_metrics
+    db.posts = db.posts || [];
+    db.post_metrics = db.post_metrics || [];
+    db.posts.forEach(p => {
+      let m = db.post_metrics.find(pm => pm.postId === p.id);
+      if (!m) {
+        m = {
+          id: db.post_metrics.length > 0 ? Math.max(...db.post_metrics.map(x => x.id)) + 1 : 1,
+          postId: p.id,
+          views: 0,
+          uniqueVisitors: 0,
+          likes: 0,
+          shares: 0,
+          commentsCount: 0,
+          createdAt: p.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        db.post_metrics.push(m);
+      }
+    });
 
     // Pull settings
     const { data: settingsData, error: sErr } = await supabase.from('platform_settings').select('*');
@@ -848,7 +980,7 @@ export function createApiRouter() {
 
   // ─────────── STUDENT AUTH & REGISTRATION ───────────
 
-  router.post('/auth/register', (req, res) => {
+  router.post('/auth/register', async (req, res) => {
     const db = loadDB();
     const { name, email, phone, whatsapp } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
@@ -868,6 +1000,7 @@ export function createApiRouter() {
       db.students.push(student);
       db.stats.totalStudents = (db.stats.totalStudents || 0) + 1;
       saveDB(db);
+      await syncRecordToSupabase('profiles', student);
     }
     res.json({ success: true, student });
   });
@@ -880,7 +1013,7 @@ export function createApiRouter() {
     res.json(student || null);
   });
 
-  router.put('/auth/student', (req, res) => {
+  router.put('/auth/student', async (req, res) => {
     const db = loadDB();
     const { email, name, phone, whatsapp } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
@@ -904,12 +1037,13 @@ export function createApiRouter() {
       if (whatsapp) student.whatsapp = whatsapp;
     }
     saveDB(db);
+    await syncRecordToSupabase('profiles', student);
     res.json(student);
   });
 
   // ─────────── CHECKOUT / ENROLLMENT INITIATION ───────────
   // Step 1: Student initiates enrollment → creates pending_payment enrollment
-  router.post('/checkout', (req, res) => {
+  router.post('/checkout', async (req, res) => {
     const db = loadDB();
     const { courseId, studentEmail, studentName, studentPhone } = req.body;
 
@@ -971,12 +1105,13 @@ export function createApiRouter() {
       course.enrolledCount = (course.enrolledCount || 0) + 1;
     }
     saveDB(db);
+    await syncRecordToSupabase('enrollments', enrollment);
     res.status(201).json({ existing: false, enrollment });
   });
 
   // ─────────── PAYMENT SUBMISSION ───────────
   // Step 2: Student submits payment transaction details
-  router.post('/payments/submit', (req, res) => {
+  router.post('/payments/submit', async (req, res) => {
     const db = loadDB();
     const {
       enrollmentId,
@@ -1065,6 +1200,9 @@ export function createApiRouter() {
       `New payment submitted by ${enrollment.studentName} for "${enrollment.courseTitle}" — Ref: ${transactionRef}`
     );
     saveDB(db);
+
+    await syncRecordToSupabase('payments', payment);
+    await syncRecordToSupabase('enrollments', enrollment);
 
     res.status(201).json({ success: true, payment });
   });
@@ -1395,33 +1533,40 @@ export function createApiRouter() {
     res.json(db.courses);
   });
 
-  router.post('/admin/courses', (req, res) => {
+  router.post('/admin/courses', async (req, res) => {
     const db = loadDB();
+    const isPub = req.body.status === 'published';
     const newCourse = {
       ...req.body,
       id: nextId(db.courses),
       status: req.body.status || 'draft',
-      approvalStatus: req.body.approvalStatus || 'pending',
+      approvalStatus: isPub ? 'approved' : (req.body.approvalStatus || 'pending'),
       createdAt: new Date().toISOString()
     };
     db.courses.unshift(newCourse);
     db.stats.totalCourses = db.courses.length;
     saveDB(db);
+    await syncRecordToSupabase('courses', newCourse);
     res.status(201).json(newCourse);
   });
 
-  router.put('/admin/courses/:id', (req, res) => {
+  router.put('/admin/courses/:id', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const idx = db.courses.findIndex(c => c.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Course not found' });
     const prev = db.courses[idx];
-    db.courses[idx] = { ...prev, ...req.body };
+    const updated = { ...prev, ...req.body };
+    if (updated.status === 'published' && (!req.body.approvalStatus || req.body.approvalStatus === 'pending')) {
+      updated.approvalStatus = 'approved';
+    }
+    db.courses[idx] = updated;
     saveDB(db);
+    await syncRecordToSupabase('courses', updated);
     res.json(db.courses[idx]);
   });
 
-  router.put('/admin/courses/:id/approve', (req, res) => {
+  router.put('/admin/courses/:id/approve', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const course = db.courses.find(c => c.id === id);
@@ -1431,10 +1576,11 @@ export function createApiRouter() {
     course.approvedAt = new Date().toISOString();
     addAuditLog(db, 'course_approved', 'admin@godolinstitute.so', 'course', id, `Approved and published course: "${course.title}"`);
     saveDB(db);
+    await syncRecordToSupabase('courses', course);
     res.json(course);
   });
 
-  router.put('/admin/courses/:id/reject', (req, res) => {
+  router.put('/admin/courses/:id/reject', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const course = db.courses.find(c => c.id === id);
@@ -1444,16 +1590,17 @@ export function createApiRouter() {
     course.rejectionReason = req.body.reason || '';
     addAuditLog(db, 'course_rejected', 'admin@godolinstitute.so', 'course', id, `Rejected course: "${course.title}" — Reason: ${req.body.reason || 'Not specified'}`);
     saveDB(db);
+    await syncRecordToSupabase('courses', course);
     res.json(course);
   });
 
-  router.delete('/admin/courses/:id', (req, res) => {
+  router.delete('/admin/courses/:id', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     db.courses = db.courses.filter(c => c.id !== id);
     db.stats.totalCourses = db.courses.length;
     saveDB(db);
-    deleteFromSupabase('courses', id);
+    await deleteFromSupabase('courses', id);
     res.json({ success: true });
   });
 
@@ -1478,7 +1625,7 @@ export function createApiRouter() {
   });
 
   // VERIFY PAYMENT — grants course access
-  router.put('/admin/payments/:id/verify', (req, res) => {
+  router.put('/admin/payments/:id/verify', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const payment = db.payments.find(p => p.id === id);
@@ -1501,6 +1648,7 @@ export function createApiRouter() {
 
     // Update enrollment — grant access
     const enrollment = db.enrollments.find(e => e.id === payment.enrollmentId);
+    let course = null;
     if (enrollment) {
       enrollment.paymentStatus = 'verified';
       enrollment.enrollmentStatus = 'approved';
@@ -1510,7 +1658,7 @@ export function createApiRouter() {
       enrollment.approvedBy = admin;
 
       // Update course enrolled count
-      const course = db.courses.find(c => c.id === enrollment.courseId);
+      course = db.courses.find(c => c.id === enrollment.courseId);
       if (course) course.enrolledCount = (course.enrolledCount || 0) + 1;
     }
 
@@ -1530,11 +1678,15 @@ export function createApiRouter() {
     );
 
     saveDB(db);
+    await syncRecordToSupabase('payments', payment);
+    if (enrollment) await syncRecordToSupabase('enrollments', enrollment);
+    if (course) await syncRecordToSupabase('courses', course);
+
     res.json({ success: true, payment, enrollment: enrollment || null });
   });
 
   // REJECT PAYMENT
-  router.put('/admin/payments/:id/reject', (req, res) => {
+  router.put('/admin/payments/:id/reject', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const payment = db.payments.find(p => p.id === id);
@@ -1570,11 +1722,14 @@ export function createApiRouter() {
     );
 
     saveDB(db);
+    await syncRecordToSupabase('payments', payment);
+    if (enrollment) await syncRecordToSupabase('enrollments', enrollment);
+
     res.json({ success: true, payment, enrollment: enrollment || null });
   });
 
   // General payment update (notes, etc.)
-  router.put('/admin/payments/:id', (req, res) => {
+  router.put('/admin/payments/:id', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const idx = db.payments.findIndex(p => p.id === id);
@@ -1583,6 +1738,7 @@ export function createApiRouter() {
     const safe = ['adminNotes', 'status'];
     safe.forEach(k => { if (req.body[k] !== undefined) db.payments[idx][k] = req.body[k]; });
     saveDB(db);
+    await syncRecordToSupabase('payments', db.payments[idx]);
     res.json(db.payments[idx]);
   });
 
@@ -1598,7 +1754,7 @@ export function createApiRouter() {
     res.json(enrollments);
   });
 
-  router.put('/admin/enrollments/:id/approve', (req, res) => {
+  router.put('/admin/enrollments/:id/approve', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const enrollment = db.enrollments.find(e => e.id === id);
@@ -1618,10 +1774,11 @@ export function createApiRouter() {
       `Your enrollment in "${enrollment.courseTitle}" has been approved. You now have full course access!`
     );
     saveDB(db);
+    await syncRecordToSupabase('enrollments', enrollment);
     res.json(enrollment);
   });
 
-  router.put('/admin/enrollments/:id/reject', (req, res) => {
+  router.put('/admin/enrollments/:id/reject', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const enrollment = db.enrollments.find(e => e.id === id);
@@ -1641,10 +1798,11 @@ export function createApiRouter() {
       `Your enrollment request for "${enrollment.courseTitle}" was not approved. Reason: ${req.body.reason || 'Contact admin for details.'}`
     );
     saveDB(db);
+    await syncRecordToSupabase('enrollments', enrollment);
     res.json(enrollment);
   });
 
-  router.put('/admin/enrollments/:id/revoke', (req, res) => {
+  router.put('/admin/enrollments/:id/revoke', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const enrollment = db.enrollments.find(e => e.id === id);
@@ -1656,25 +1814,27 @@ export function createApiRouter() {
       `Revoked course access for ${enrollment.studentName} from "${enrollment.courseTitle}"`
     );
     saveDB(db);
+    await syncRecordToSupabase('enrollments', enrollment);
     res.json(enrollment);
   });
 
-  router.put('/admin/enrollments/:id', (req, res) => {
+  router.put('/admin/enrollments/:id', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const idx = db.enrollments.findIndex(e => e.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Enrollment not found' });
     db.enrollments[idx] = { ...db.enrollments[idx], ...req.body };
     saveDB(db);
+    await syncRecordToSupabase('enrollments', db.enrollments[idx]);
     res.json(db.enrollments[idx]);
   });
 
-  router.delete('/admin/enrollments/:id', (req, res) => {
+  router.delete('/admin/enrollments/:id', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     db.enrollments = db.enrollments.filter(e => e.id !== id);
     saveDB(db);
-    deleteFromSupabase('enrollments', id);
+    await deleteFromSupabase('enrollments', id);
     res.json({ success: true });
   });
 
@@ -1743,7 +1903,7 @@ export function createApiRouter() {
     res.json({ student: student || null, enrollments, payments, certificates: certs });
   });
 
-  router.put('/admin/students/:email/suspend', (req, res) => {
+  router.put('/admin/students/:email/suspend', async (req, res) => {
     const db = loadDB();
     const email = decodeURIComponent(req.params.email).toLowerCase();
     const student = db.students.find(s => s.email.toLowerCase() === email);
@@ -1751,11 +1911,12 @@ export function createApiRouter() {
       student.status = 'suspended';
       addAuditLog(db, 'student_suspended', req.body.adminEmail || 'admin@godolinstitute.so', 'student', student.id, `Suspended account: ${email}`);
       saveDB(db);
+      await syncRecordToSupabase('profiles', student);
     }
     res.json({ success: true });
   });
 
-  router.put('/admin/students/:email/activate', (req, res) => {
+  router.put('/admin/students/:email/activate', async (req, res) => {
     const db = loadDB();
     const email = decodeURIComponent(req.params.email).toLowerCase();
     const student = db.students.find(s => s.email.toLowerCase() === email);
@@ -1763,17 +1924,19 @@ export function createApiRouter() {
       student.status = 'active';
       addAuditLog(db, 'student_activated', req.body.adminEmail || 'admin@godolinstitute.so', 'student', student.id, `Re-activated account: ${email}`);
       saveDB(db);
+      await syncRecordToSupabase('profiles', student);
     }
     res.json({ success: true });
   });
 
-  router.put('/admin/students/:email/notes', (req, res) => {
+  router.put('/admin/students/:email/notes', async (req, res) => {
     const db = loadDB();
     const email = decodeURIComponent(req.params.email).toLowerCase();
     const student = db.students.find(s => s.email.toLowerCase() === email);
     if (student) {
       student.adminNotes = req.body.notes || '';
       saveDB(db);
+      await syncRecordToSupabase('profiles', student);
     }
     res.json({ success: true });
   });
@@ -1886,7 +2049,7 @@ export function createApiRouter() {
     res.json(instructors);
   });
 
-  router.post('/admin/instructors', (req, res) => {
+  router.post('/admin/instructors', async (req, res) => {
     const db = loadDB();
     const inst = {
       ...req.body,
@@ -1910,26 +2073,28 @@ export function createApiRouter() {
     db.instructors.push(inst);
     db.stats.totalInstructors = db.instructors.length;
     saveDB(db);
+    await syncRecordToSupabase('instructors', inst);
     res.status(201).json(inst);
   });
 
-  router.put('/admin/instructors/:id', (req, res) => {
+  router.put('/admin/instructors/:id', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const idx = db.instructors.findIndex(i => i.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Instructor not found' });
     db.instructors[idx] = { ...db.instructors[idx], ...req.body };
     saveDB(db);
+    await syncRecordToSupabase('instructors', db.instructors[idx]);
     res.json(db.instructors[idx]);
   });
 
-  router.delete('/admin/instructors/:id', (req, res) => {
+  router.delete('/admin/instructors/:id', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     db.instructors = db.instructors.filter(i => i.id !== id);
     db.stats.totalInstructors = db.instructors.length;
     saveDB(db);
-    deleteFromSupabase('instructors', id);
+    await deleteFromSupabase('instructors', id);
     res.json({ success: true });
   });
 
@@ -2480,7 +2645,7 @@ export function createApiRouter() {
   router.get('/admin/blog', handleAdminGetPosts);
 
   // Admin: Create post for ANY author
-  const handleAdminCreatePost = (req, res) => {
+  const handleAdminCreatePost = async (req, res) => {
     const db = loadDB();
     const { title, slug, content, featuredImageUrl, authorId, author, authorName, status, category, excerpt, publishedAt } = req.body || {};
     if (!title) return res.status(400).json({ error: 'Title is required' });
@@ -2545,6 +2710,7 @@ export function createApiRouter() {
     db.post_metrics.push(newMetric);
 
     saveDB(db);
+    await syncPostToSupabase(post);
     res.status(201).json(formatPostResponse(post, db));
   };
 
@@ -2552,7 +2718,7 @@ export function createApiRouter() {
   router.post('/admin/blog', handleAdminCreatePost);
 
   // Admin: Edit ANY post
-  const handleAdminUpdatePost = (req, res) => {
+  const handleAdminUpdatePost = async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const idx = (db.posts || []).findIndex(p => p.id === id);
@@ -2588,6 +2754,7 @@ export function createApiRouter() {
     post.updatedAt = new Date().toISOString();
 
     saveDB(db);
+    await syncPostToSupabase(post);
     res.json(formatPostResponse(post, db));
   };
 
@@ -2595,7 +2762,7 @@ export function createApiRouter() {
   router.put('/admin/blog/:id', handleAdminUpdatePost);
 
   // Admin: Delete ANY post
-  const handleAdminDeletePost = (req, res) => {
+  const handleAdminDeletePost = async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     db.posts = (db.posts || []).filter(p => p.id !== id);
@@ -2604,9 +2771,7 @@ export function createApiRouter() {
     if (db.post_comments) db.post_comments = db.post_comments.filter(c => c.postId !== id);
     saveDB(db);
 
-    deleteFromSupabase('posts', id);
-    deleteFromSupabase('post_metrics', id);
-    deleteFromSupabase('blog_posts', id);
+    await deletePostFromSupabase(id);
     res.json({ success: true });
   };
 
@@ -2647,7 +2812,7 @@ export function createApiRouter() {
     res.json(db.certificates);
   });
 
-  router.post('/admin/certificates', (req, res) => {
+  router.post('/admin/certificates', async (req, res) => {
     const db = loadDB();
     const cert = {
       ...req.body,
@@ -2658,15 +2823,16 @@ export function createApiRouter() {
     };
     db.certificates.push(cert);
     saveDB(db);
+    await syncRecordToSupabase('certificates', cert);
     res.status(201).json(cert);
   });
 
-  router.delete('/admin/certificates/:id', (req, res) => {
+  router.delete('/admin/certificates/:id', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     db.certificates = db.certificates.filter(c => c.id !== id);
     saveDB(db);
-    deleteFromSupabase('certificates', id);
+    await deleteFromSupabase('certificates', id);
     res.json({ success: true });
   });
 
@@ -2677,30 +2843,32 @@ export function createApiRouter() {
     res.json(db.categories);
   });
 
-  router.post('/admin/categories', (req, res) => {
+  router.post('/admin/categories', async (req, res) => {
     const db = loadDB();
     const cat = { ...req.body, id: nextId(db.categories) };
     db.categories.push(cat);
     saveDB(db);
+    await syncRecordToSupabase('categories', cat);
     res.status(201).json(cat);
   });
 
-  router.put('/admin/categories/:id', (req, res) => {
+  router.put('/admin/categories/:id', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     const idx = db.categories.findIndex(c => c.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Category not found' });
     db.categories[idx] = { ...db.categories[idx], ...req.body };
     saveDB(db);
+    await syncRecordToSupabase('categories', db.categories[idx]);
     res.json(db.categories[idx]);
   });
 
-  router.delete('/admin/categories/:id', (req, res) => {
+  router.delete('/admin/categories/:id', async (req, res) => {
     const db = loadDB();
     const id = Number(req.params.id);
     db.categories = db.categories.filter(c => c.id !== id);
     saveDB(db);
-    deleteFromSupabase('categories', id);
+    await deleteFromSupabase('categories', id);
     res.json({ success: true });
   });
 
@@ -2711,7 +2879,7 @@ export function createApiRouter() {
     res.json(db.settings);
   });
 
-  router.put('/admin/settings', (req, res) => {
+  router.put('/admin/settings', async (req, res) => {
     const db = loadDB();
     const updates = req.body;
     Object.entries(updates).forEach(([key, value]) => {
@@ -2723,6 +2891,9 @@ export function createApiRouter() {
       }
     });
     saveDB(db);
+    if (db.settings) {
+      await syncTable('platform_settings', db.settings);
+    }
     res.json(db.settings);
   });
 
