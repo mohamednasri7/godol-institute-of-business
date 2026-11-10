@@ -12,7 +12,7 @@ export default function QuickActionsToolbar() {
   ];
 
   return (
-    <div className="bg-white dark:bg-card border border-gray-200 dark:border-border rounded-2xl p-4 sm:p-5 shadow-sm">
+    <div className="liquid-glass liquid-glass-squircle p-4 sm:p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-3">
         <Sparkles className="w-4 h-4 text-primary" />
         <h4 className="font-bold text-gray-900 dark:text-foreground text-xs sm:text-sm uppercase tracking-wider">
@@ -26,7 +26,7 @@ export default function QuickActionsToolbar() {
             <Link
               key={act.label}
               href={act.href}
-              className={`p-3 rounded-xl border border-gray-200 dark:border-border hover:shadow-sm transition-all flex flex-col items-center justify-center text-center gap-2 group ${act.color}`}
+              className={`p-3 rounded-2xl border border-white/20 hover:shadow-md transition-all flex flex-col items-center justify-center text-center gap-2 group liquid-glass-interactive ${act.color}`}
             >
               <Icon className="w-5 h-5 transition-transform group-hover:scale-110" />
               <span className="text-xs font-bold text-gray-800 dark:text-foreground truncate w-full">

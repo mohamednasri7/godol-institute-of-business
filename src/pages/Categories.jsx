@@ -79,7 +79,7 @@ export default function Categories() {
                 <Link
                   key={cat.id}
                   href={`/courses?category=${encodeURIComponent(cat.name)}`}
-                  className="group flex flex-col items-center justify-center p-8 bg-card rounded-2xl border border-border hover:border-primary/50 hover:shadow-xl transition-all duration-300 text-center"
+                  className="group flex flex-col items-center justify-center p-8 liquid-glass liquid-glass-squircle liquid-glass-interactive text-center"
                 >
                   <div
                     className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3"
@@ -124,7 +124,7 @@ export default function Categories() {
               {workshops.map((w) => (
                 <div
                   key={w.id}
-                  className="bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:border-primary/30 transition-all flex flex-col"
+                  className="liquid-glass liquid-glass-squircle liquid-glass-interactive p-6 flex flex-col"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <span

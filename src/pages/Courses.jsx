@@ -123,7 +123,7 @@ export default function Courses() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search courses, topics, skills…"
-                className="w-full bg-white/10 backdrop-blur border border-white/20 text-white placeholder:text-white/50 rounded-xl pl-12 pr-10 py-3.5 text-sm outline-none focus:bg-white/15 focus:border-white/30 transition-all"
+                className="w-full liquid-glass-input text-white placeholder:text-white/60 rounded-xl pl-12 pr-10 py-3.5 text-sm outline-none"
               />
               {searchQuery && (
                 <button
@@ -158,7 +158,7 @@ export default function Courses() {
       {/* Filter drawer / controls */}
       <div className="container mx-auto px-4 md:px-6 py-8">
         {(showFilters || activeFiltersCount > 0) && (
-          <div className="bg-card border border-border rounded-2xl p-6 mb-8 shadow-sm">
+          <div className="liquid-glass liquid-glass-squircle p-6 mb-8">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-border mb-4">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-primary" />

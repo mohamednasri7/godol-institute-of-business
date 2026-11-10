@@ -163,3 +163,203 @@ body {
   background: #a8a8a8;
 }
 
+/* ============================================================================== */
+/* APPLE OS 26 "LIQUID GLASS" SPATIAL DESIGN SYSTEM                              */
+/* ============================================================================== */
+
+:root {
+  /* OS 26 Liquid Glass - Light / Adaptive Spatial Mode */
+  --liquid-glass-fill: linear-gradient(135deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.52) 100%);
+  --liquid-glass-fill-subtle: linear-gradient(135deg, rgba(255, 255, 255, 0.50) 0%, rgba(255, 255, 255, 0.22) 100%);
+  --liquid-glass-fill-elevated: linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(255, 255, 255, 0.65) 100%);
+  --liquid-glass-border: rgba(255, 255, 255, 0.65);
+  --liquid-glass-border-outer: 1px solid rgba(255, 255, 255, 0.65);
+  --liquid-glass-border-hover: rgba(255, 255, 255, 0.95);
+  --liquid-glass-specular: inset 0 1px 0 0 rgba(255, 255, 255, 0.85), inset 0 0 16px rgba(255, 255, 255, 0.20), 0 12px 36px -4px rgba(15, 23, 42, 0.08);
+  --liquid-glass-specular-hover: inset 0 1px 0 0 rgba(255, 255, 255, 1), inset 0 0 20px rgba(255, 255, 255, 0.35), 0 20px 42px -6px rgba(15, 23, 42, 0.14);
+  --liquid-glass-modal-specular: inset 0 1px 0 0 rgba(255, 255, 255, 0.95), inset 0 0 24px rgba(255, 255, 255, 0.25), 0 28px 64px -12px rgba(15, 23, 42, 0.20);
+  --liquid-spring: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  --liquid-blur: blur(28px) saturate(190%) brightness(1.04);
+}
+
+.dark {
+  /* OS 26 Liquid Glass - Dark Spatial Mode */
+  --liquid-glass-fill: linear-gradient(135deg, rgba(30, 30, 38, 0.68) 0%, rgba(15, 15, 22, 0.48) 100%);
+  --liquid-glass-fill-subtle: linear-gradient(135deg, rgba(30, 30, 38, 0.42) 0%, rgba(15, 15, 22, 0.22) 100%);
+  --liquid-glass-fill-elevated: linear-gradient(135deg, rgba(36, 36, 46, 0.78) 0%, rgba(18, 18, 26, 0.58) 100%);
+  --liquid-glass-border: rgba(255, 255, 255, 0.20);
+  --liquid-glass-border-outer: 1px solid rgba(255, 255, 255, 0.20);
+  --liquid-glass-border-hover: rgba(255, 255, 255, 0.45);
+  --liquid-glass-specular: inset 0 1px 0 0 rgba(255, 255, 255, 0.40), inset 0 0 16px rgba(255, 255, 255, 0.06), 0 14px 40px -4px rgba(0, 0, 0, 0.55);
+  --liquid-glass-specular-hover: inset 0 1px 0 0 rgba(255, 255, 255, 0.65), inset 0 0 20px rgba(255, 255, 255, 0.12), 0 22px 52px -6px rgba(0, 0, 0, 0.70);
+  --liquid-glass-modal-specular: inset 0 1px 0 0 rgba(255, 255, 255, 0.50), inset 0 0 24px rgba(255, 255, 255, 0.10), 0 30px 70px -12px rgba(0, 0, 0, 0.80);
+}
+
+/* Primary Translucent Surface with Optical Blur & Specular Refraction */
+.liquid-glass {
+  background: var(--liquid-glass-fill);
+  backdrop-filter: var(--liquid-blur);
+  -webkit-backdrop-filter: var(--liquid-blur);
+  border: var(--liquid-glass-border-outer);
+  box-shadow: var(--liquid-glass-specular);
+  position: relative;
+  isolation: isolate;
+}
+
+/* Subtle Nested Glass Layer */
+.liquid-glass-subtle {
+  background: var(--liquid-glass-fill-subtle);
+  backdrop-filter: var(--liquid-blur);
+  -webkit-backdrop-filter: var(--liquid-blur);
+  border: 1px solid var(--liquid-glass-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.35), 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+}
+
+/* Elevated Glass Surface */
+.liquid-glass-elevated {
+  background: var(--liquid-glass-fill-elevated);
+  backdrop-filter: blur(32px) saturate(200%) brightness(1.05);
+  -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.05);
+  border: var(--liquid-glass-border-outer);
+  box-shadow: var(--liquid-glass-modal-specular);
+}
+
+/* Continuous Squircle Curvature (24px - 28px) */
+.liquid-glass-squircle {
+  border-radius: 26px;
+}
+
+/* Continuous Pill Shape (9999px) */
+.liquid-glass-pill {
+  border-radius: 9999px;
+}
+
+/* Spring-like Fluid Physics Micro-interactions */
+.liquid-glass-interactive {
+  transition: var(--liquid-spring);
+  will-change: transform, box-shadow, border-color;
+}
+
+.liquid-glass-interactive:hover {
+  transform: translateY(-2px) scale(1.01);
+  border-color: var(--liquid-glass-border-hover);
+  box-shadow: var(--liquid-glass-specular-hover);
+}
+
+.liquid-glass-interactive:active {
+  transform: translateY(0px) scale(0.995);
+  transition-duration: 0.15s;
+}
+
+/* OS 26 Floating Navbar Glass */
+.liquid-glass-nav {
+  background: var(--liquid-glass-fill);
+  backdrop-filter: var(--liquid-blur);
+  -webkit-backdrop-filter: var(--liquid-blur);
+  border-bottom: 1px solid var(--liquid-glass-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.55), 0 10px 30px -5px rgba(0, 0, 0, 0.08);
+}
+
+/* Spatial Modal Dialog Glass */
+.liquid-glass-modal {
+  background: var(--liquid-glass-fill-elevated);
+  backdrop-filter: blur(32px) saturate(200%) brightness(1.05);
+  -webkit-backdrop-filter: blur(32px) saturate(200%) brightness(1.05);
+  border: var(--liquid-glass-border-outer);
+  box-shadow: var(--liquid-glass-modal-specular);
+}
+
+/* Translucent Inputs with Specular Highlight on Focus */
+.liquid-glass-input {
+  background: var(--liquid-glass-fill-subtle);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid var(--liquid-glass-border);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.35), inset 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: var(--liquid-spring);
+}
+
+.liquid-glass-input:focus {
+  border-color: hsl(var(--primary));
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.65), 0 0 0 3px rgba(37, 99, 235, 0.25);
+  transform: scale(1.005);
+}
+
+/* Translucent Buttons with Spring Lift */
+.liquid-glass-btn {
+  background: var(--liquid-glass-fill);
+  backdrop-filter: var(--liquid-blur);
+  -webkit-backdrop-filter: var(--liquid-blur);
+  border: var(--liquid-glass-border-outer);
+  box-shadow: var(--liquid-glass-specular);
+  transition: var(--liquid-spring);
+}
+
+.liquid-glass-btn:hover {
+  transform: translateY(-1.5px) scale(1.02);
+  border-color: var(--liquid-glass-border-hover);
+  box-shadow: var(--liquid-glass-specular-hover);
+}
+
+.liquid-glass-btn:active {
+  transform: translateY(0.5px) scale(0.98);
+}
+
+/* Sub-card Content Contrast & Legibility Enhancements */
+.liquid-glass h1,
+.liquid-glass h2,
+.liquid-glass h3,
+.liquid-glass h4 {
+  text-rendering: optimizeLegibility;
+}
+
+/* ============================================================================== */
+/* ACCESSIBILITY SAFEGUARDS & FALLBACKS                                           */
+/* ============================================================================== */
+
+/* 1. Unsupported Backdrop Filter Fallback */
+@supports not (backdrop-filter: blur(1px)) {
+  .liquid-glass,
+  .liquid-glass-subtle,
+  .liquid-glass-elevated,
+  .liquid-glass-modal,
+  .liquid-glass-nav,
+  .liquid-glass-btn,
+  .liquid-glass-input {
+    background: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+  }
+}
+
+/* 2. Reduced Transparency Mode */
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass,
+  .liquid-glass-subtle,
+  .liquid-glass-elevated,
+  .liquid-glass-modal,
+  .liquid-glass-nav,
+  .liquid-glass-btn,
+  .liquid-glass-input {
+    background: hsl(var(--card)) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-color: hsl(var(--border)) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
+  }
+}
+
+/* 3. Reduced Motion Mode */
+@media (prefers-reduced-motion: reduce) {
+  .liquid-glass-interactive,
+  .liquid-glass-btn,
+  .liquid-glass-input {
+    transition: none !important;
+    transform: none !important;
+  }
+  .liquid-glass-interactive:hover,
+  .liquid-glass-btn:hover {
+    transform: none !important;
+  }
+}
+

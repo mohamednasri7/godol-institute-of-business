@@ -56,7 +56,7 @@ export default function BlogPost() {
             const matchingCat = others.filter((p) => p.category === data.category);
             setRelatedPosts((matchingCat.length > 0 ? matchingCat : others).slice(0, 3));
           })
-          .catch(() => {});
+          .catch(() => { });
       })
       .catch((err) => {
         console.error('Failed to load article:', err);
@@ -309,15 +309,14 @@ export default function BlogPost() {
         </article>
 
         {/* Interactive Engagement Bar (Like & Share) */}
-        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mb-14">
+        <div className="liquid-glass liquid-glass-squircle p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 mb-14">
           <div className="flex items-center gap-3">
             <button
               onClick={handleLike}
-              className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-xs ${
-                hasLiked
+              className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs transition-all shadow-xs ${hasLiked
                   ? 'bg-amber-500 text-white shadow-amber-500/20'
                   : 'bg-muted hover:bg-muted/80 text-foreground border border-border'
-              }`}
+                }`}
             >
               <ThumbsUp className={`w-4 h-4 ${hasLiked ? 'fill-current' : ''}`} />
               <span>{hasLiked ? 'Liked' : 'Like Article'} ({likeCount})</span>
@@ -348,7 +347,7 @@ export default function BlogPost() {
         </div>
 
         {/* Author Bio Box */}
-        <div className="bg-card border border-border rounded-3xl p-6 md:p-8 mb-14 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-5">
+        <div className="liquid-glass liquid-glass-squircle p-6 md:p-8 mb-14 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-5">
           <div className="w-16 h-16 rounded-2xl bg-primary text-primary-foreground font-serif font-bold text-2xl flex items-center justify-center flex-shrink-0 shadow-md">
             {(post.authorName || post.author || 'G').charAt(0).toUpperCase()}
           </div>
@@ -371,7 +370,7 @@ export default function BlogPost() {
           </div>
 
           {/* Comment Form */}
-          <form onSubmit={handleCommentSubmit} className="bg-card border border-border rounded-3xl p-6 md:p-8 shadow-sm space-y-4">
+          <form onSubmit={handleCommentSubmit} className="liquid-glass liquid-glass-squircle p-6 md:p-8 shadow-sm space-y-4">
             <div>
               <h4 className="font-bold text-sm text-foreground">Leave a Comment</h4>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -483,7 +482,7 @@ export default function BlogPost() {
                 <Link
                   key={rel.id}
                   href={`/blog/${rel.slug || rel.id}`}
-                  className="bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:border-primary/40 transition-all flex flex-col group"
+                  className="liquid-glass liquid-glass-squircle liquid-glass-interactive overflow-hidden flex flex-col group cursor-pointer"
                 >
                   {(rel.featuredImageUrl || rel.featured_image_url) ? (
                     <div className="h-40 w-full overflow-hidden bg-muted">

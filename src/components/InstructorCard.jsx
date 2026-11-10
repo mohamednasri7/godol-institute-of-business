@@ -10,9 +10,9 @@ export default function InstructorCard({ instructor }) {
   return (
     <Link
       href={`/instructors/${instructor.id}`}
-      className="group flex flex-col items-center p-6 bg-card rounded-2xl border border-border hover:border-primary/40 hover:shadow-xl transition-all duration-300 text-center"
+      className="group flex flex-col items-center p-6 liquid-glass liquid-glass-squircle liquid-glass-interactive text-center cursor-pointer"
     >
-      <div className="w-24 h-24 rounded-full overflow-hidden mb-4 border-4 border-background shadow-md group-hover:scale-105 transition-transform duration-300 bg-muted">
+      <div className="w-24 h-24 rounded-full overflow-hidden mb-4 border-2 border-white/60 dark:border-white/20 shadow-lg group-hover:scale-105 transition-transform duration-300 bg-muted/60">
         <img
           src={avatar}
           alt={instructor.name}

@@ -86,8 +86,8 @@ export default function About() {
   const [sendError, setSendError] = useState('');
 
   useEffect(() => {
-    apiFetch('/api/instructors').then(setFaculty).catch(() => {});
-    apiFetch('/api/settings').then(res => setSettings(res.map || {})).catch(() => {});
+    apiFetch('/api/instructors').then(setFaculty).catch(() => { });
+    apiFetch('/api/settings').then(res => setSettings(res.map || {})).catch(() => { });
   }, []);
 
   const handleContactSubmit = async (e) => {
@@ -180,7 +180,7 @@ export default function About() {
               ].map(({ icon: Icon, val, label }) => (
                 <div
                   key={label}
-                  className="bg-card border border-border rounded-2xl p-6 text-center hover:border-primary/30 hover:shadow-lg transition-all"
+                  className="liquid-glass liquid-glass-squircle liquid-glass-interactive p-6 text-center"
                 >
                   <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-3">
                     <Icon className="w-6 h-6" />
@@ -210,7 +210,7 @@ export default function About() {
             {coreValues.map(({ icon: Icon, title, desc }) => (
               <div
                 key={title}
-                className="bg-card border border-border rounded-2xl p-6 h-full hover:border-primary/30 hover:shadow-lg transition-all"
+                className="liquid-glass liquid-glass-squircle liquid-glass-interactive p-6 h-full"
               >
                 <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5">
                   <Icon className="w-5 h-5" />
@@ -448,7 +448,7 @@ export default function About() {
               </div>
             </div>
 
-            <div className="bg-card border border-border rounded-3xl p-8 shadow-sm">
+            <div className="liquid-glass liquid-glass-squircle p-8 shadow-xl">
               <h3 className="font-serif text-2xl font-bold mb-6 text-foreground">
                 Send Us a Message
               </h3>

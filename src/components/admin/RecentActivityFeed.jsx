@@ -34,7 +34,7 @@ export default function RecentActivityFeed({ payments = [], enrollments = [] }) 
   };
 
   return (
-    <div className="bg-white dark:bg-card border border-gray-200 dark:border-border rounded-2xl p-5 sm:p-6 shadow-sm">
+    <div className="liquid-glass liquid-glass-squircle p-5 sm:p-6 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-primary" />

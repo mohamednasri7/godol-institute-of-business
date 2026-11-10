@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'wouter';
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  ArrowRight, 
-  Eye, 
-  ThumbsUp, 
+import {
+  Calendar,
+  Clock,
+  User,
+  ArrowRight,
+  Eye,
+  ThumbsUp,
   Search,
   BookOpen,
   Sparkles,
@@ -126,11 +126,10 @@ export default function Blog() {
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-4 py-2 rounded-full text-xs font-semibold transition-all border ${
-                      selectedCategory === cat
+                    className={`px-4 py-2 rounded-full text-xs font-semibold transition-all border ${selectedCategory === cat
                         ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                         : 'bg-card text-muted-foreground border-border hover:border-primary/30 hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     {cat}
                   </button>
@@ -145,7 +144,7 @@ export default function Blog() {
             {featuredPost && (
               <Link
                 href={`/blog/${featuredPost.slug || featuredPost.id}`}
-                className="block rounded-3xl overflow-hidden border border-border bg-card hover:shadow-2xl transition-all duration-300 group cursor-pointer mb-14"
+                className="block liquid-glass liquid-glass-squircle liquid-glass-interactive overflow-hidden group cursor-pointer mb-14"
               >
                 <div className="grid grid-cols-1 lg:grid-cols-5">
                   <div
@@ -225,7 +224,7 @@ export default function Blog() {
                 <Link
                   key={post.id}
                   href={`/blog/${post.slug || post.id}`}
-                  className="bg-card border border-border rounded-3xl overflow-hidden hover:shadow-2xl hover:border-primary/40 transition-all duration-300 flex flex-col group cursor-pointer"
+                  className="liquid-glass liquid-glass-squircle liquid-glass-interactive overflow-hidden flex flex-col group cursor-pointer"
                 >
                   {(post.featuredImageUrl || post.featured_image_url) ? (
                     <div className="h-48 w-full overflow-hidden bg-muted">

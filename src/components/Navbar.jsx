@@ -51,7 +51,7 @@ export default function Navbar() {
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isTransparent
           ? 'bg-transparent py-5'
-          : 'bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-border shadow-sm py-3'
+          : 'liquid-glass-nav py-3'
       }`}
     >
       <div className="container mx-auto px-4 md:px-6 flex items-center justify-between">
@@ -196,7 +196,7 @@ export default function Navbar() {
 
       {/* Mobile Menu Dropdown */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden absolute top-full left-0 right-0 bg-white dark:bg-slate-900 border-b border-border shadow-xl py-5 px-6 flex flex-col gap-2">
+        <div className="lg:hidden absolute top-full left-0 right-0 liquid-glass border-b border-border shadow-2xl py-5 px-6 flex flex-col gap-2 rounded-b-3xl">
           {/* Night Mode Switch in Drawer */}
           <div className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-muted/40 mb-1">
             <span className="flex items-center gap-2 text-sm font-medium text-foreground">

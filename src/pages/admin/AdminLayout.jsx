@@ -217,7 +217,7 @@ export default function AdminLayout({ children, title, subtitle }) {
               </button>
 
               {isNotificationOpen && (
-                <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white dark:bg-card border border-border rounded-2xl shadow-xl z-50 p-3 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute right-0 mt-2 w-72 sm:w-80 liquid-glass liquid-glass-elevated liquid-glass-squircle z-50 p-3 space-y-2 animate-in fade-in zoom-in-95 duration-150">
                   <div className="flex items-center justify-between pb-2 border-b border-border">
                     <span className="text-xs font-bold text-foreground">Notifications</span>
                     <span className="text-[10px] text-muted-foreground">{pendingCount} pending</span>
@@ -257,7 +257,7 @@ export default function AdminLayout({ children, title, subtitle }) {
               </button>
 
               {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-card border border-border rounded-2xl shadow-xl z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                <div className="absolute right-0 mt-2 w-56 liquid-glass liquid-glass-elevated liquid-glass-squircle z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150">
                   <div className="px-3 py-2 border-b border-border">
                     <p className="text-xs font-bold text-foreground truncate">{adminUser}</p>
                     <p className="text-[10px] text-muted-foreground">Administrator</p>

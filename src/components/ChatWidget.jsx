@@ -93,7 +93,7 @@ export default function ChatWidget() {
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 max-w-[calc(100vw-2rem)]">
       {isOpen && (
-        <div className="w-[340px] sm:w-[380px] max-w-[calc(100vw-2rem)] rounded-2xl overflow-hidden shadow-2xl border border-border bg-card flex flex-col h-[500px] animate-in fade-in slide-in-from-bottom-5 duration-200">
+        <div className="w-[340px] sm:w-[380px] max-w-[calc(100vw-2rem)] liquid-glass liquid-glass-modal liquid-glass-squircle overflow-hidden flex flex-col h-[500px] animate-in fade-in slide-in-from-bottom-5 duration-300">
           {/* Header */}
           <div className="bg-primary text-primary-foreground p-4 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-3">
@@ -190,8 +190,8 @@ export default function ChatWidget() {
       {/* Floating Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-primary-foreground transition-transform hover:scale-105 active:scale-95"
-        style={{ background: 'hsl(215 72% 24%)' }}
+        className="relative w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-primary-foreground transition-all duration-300 hover:scale-105 active:scale-95 border border-white/30 backdrop-blur-md"
+        style={{ background: 'linear-gradient(135deg, hsl(215 72% 26%) 0%, hsl(215 72% 18%) 100%)', boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.4), 0 12px 30px -4px rgba(15, 23, 42, 0.35)' }}
         aria-label="Open Advisory Chat"
       >
         {isOpen ? (

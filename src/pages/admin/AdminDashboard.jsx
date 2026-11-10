@@ -19,20 +19,20 @@ import GlobalSearchModal from '../../components/admin/GlobalSearchModal';
 
 function StatCard({ label, value, sub, trend, icon: Icon, color, linkTo }) {
   const card = (
-    <div className={`bg-white dark:bg-card border border-gray-200 dark:border-border rounded-2xl p-5 sm:p-6 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow h-full ${linkTo ? 'cursor-pointer' : ''}`}>
+    <div className={`liquid-glass liquid-glass-squircle liquid-glass-interactive p-5 sm:p-6 flex items-center justify-between h-full ${linkTo ? 'cursor-pointer' : ''}`}>
       <div className="min-w-0 pr-3">
         <p className="text-xs font-semibold text-gray-500 dark:text-muted-foreground uppercase tracking-wider mb-1 truncate">{label}</p>
         <div className="text-2xl font-bold text-gray-900 dark:text-foreground mb-1">{value}</div>
         <div className="flex items-center gap-1.5 flex-wrap">
           {trend && (
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-full border border-emerald-300/30">
               {trend}
             </span>
           )}
           {sub && <span className="text-xs text-gray-500 dark:text-muted-foreground truncate">{sub}</span>}
         </div>
       </div>
-      <div className={`w-12 h-12 rounded-2xl ${color} text-white flex items-center justify-center shadow-md flex-shrink-0`}>
+      <div className={`w-12 h-12 rounded-2xl ${color} text-white flex items-center justify-center shadow-md border border-white/20 flex-shrink-0`}>
         <Icon className="w-6 h-6" />
       </div>
     </div>

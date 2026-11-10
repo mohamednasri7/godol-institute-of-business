@@ -81,7 +81,7 @@ export default function DashboardCharts({ payments = [], enrollments = [], cours
   const maxStudents = Math.max(...studentGrowthData.map(d => d.count), 10);
 
   return (
-    <div className="bg-white dark:bg-card border border-gray-200 dark:border-border rounded-2xl p-5 sm:p-6 shadow-sm">
+    <div className="liquid-glass liquid-glass-squircle p-5 sm:p-6 shadow-sm">
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>

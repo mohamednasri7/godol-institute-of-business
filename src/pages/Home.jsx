@@ -144,7 +144,7 @@ export default function Home() {
             )}
 
             {/* Tag badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/20 bg-white/10 text-white/90 text-sm font-medium mb-8 backdrop-blur-sm">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 liquid-glass-pill liquid-glass-subtle text-white/90 text-sm font-medium mb-8">
               <Sparkles className="w-3.5 h-3.5 text-accent" />
               <span>{settings.home_badge_text || 'Bosaso, Somalia — Est. 2025'}</span>
             </div>
@@ -187,7 +187,7 @@ export default function Home() {
             <div className="max-w-2xl mx-auto mb-12">
               <form
                 onSubmit={handleSearchSubmit}
-                className="flex flex-col sm:flex-row gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-2"
+                className="flex flex-col sm:flex-row gap-2 liquid-glass-subtle liquid-glass-squircle p-2 shadow-2xl"
               >
                 <div className="relative flex-1">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
@@ -314,7 +314,7 @@ export default function Home() {
               <Link
                 key={title}
                 href={`/courses?category=${encodeURIComponent(title)}`}
-                className="group h-full bg-card border border-border rounded-2xl p-7 hover:border-primary/40 hover:shadow-xl transition-all duration-300 flex flex-col"
+                className="group h-full liquid-glass liquid-glass-squircle liquid-glass-interactive p-7 flex flex-col cursor-pointer"
               >
                 <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                   <Icon className="w-6 h-6" />
@@ -365,7 +365,7 @@ export default function Home() {
               {displayWorkshops.slice(0, 3).map((w, idx) => (
                 <div
                   key={w.title || idx}
-                  className="bg-card border border-border rounded-2xl p-6 hover:shadow-lg hover:border-primary/30 transition-all h-full flex flex-col"
+                  className="liquid-glass liquid-glass-squircle liquid-glass-interactive p-6 h-full flex flex-col"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <span
@@ -486,11 +486,7 @@ export default function Home() {
             {testimonials.map((item) => (
               <div
                 key={item.name}
-                className="rounded-2xl p-7 h-full flex flex-col backdrop-blur-sm"
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.1)'
-                }}
+                className="liquid-glass-subtle liquid-glass-squircle liquid-glass-interactive p-7 h-full flex flex-col"
               >
                 <div className="flex gap-1 mb-5">
                   {Array(item.rating)

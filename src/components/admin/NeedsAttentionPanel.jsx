@@ -11,7 +11,7 @@ export default function NeedsAttentionPanel({ pendingPayments = [], pendingEnrol
 
   if (totalUrgent === 0) {
     return (
-      <div className="bg-white dark:bg-card border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-5 sm:p-6 shadow-sm flex items-center gap-4">
+      <div className="liquid-glass liquid-glass-squircle border-emerald-300/50 dark:border-emerald-700/50 p-5 sm:p-6 flex items-center gap-4">
         <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 flex items-center justify-center flex-shrink-0">
           <CheckCircle className="w-5 h-5" />
         </div>
@@ -26,7 +26,7 @@ export default function NeedsAttentionPanel({ pendingPayments = [], pendingEnrol
   }
 
   return (
-    <div className="bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 rounded-2xl p-5 sm:p-6 shadow-sm">
+    <div className="liquid-glass liquid-glass-squircle border-amber-300/50 dark:border-amber-700/50 p-5 sm:p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />

@@ -35,16 +35,16 @@ export default function CourseCard({ course }) {
   return (
     <Link
       href={`/courses/${course.id}`}
-      className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden hover:border-primary/40 hover:shadow-xl transition-all duration-300"
+      className="group flex flex-col h-full liquid-glass liquid-glass-squircle liquid-glass-interactive overflow-hidden cursor-pointer"
     >
-      <div className="relative aspect-video overflow-hidden bg-muted">
+      <div className="relative aspect-video overflow-hidden bg-muted/60">
         <img
           src={thumbnail}
           alt={course.title}
           className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500"
         />
         {course.badge && (
-          <span className="absolute top-3 left-3 bg-primary text-primary-foreground font-semibold text-xs px-2.5 py-1 rounded-md shadow-sm">
+          <span className="absolute top-3 left-3 bg-primary/90 text-primary-foreground font-semibold text-xs px-3 py-1 rounded-full shadow-md border border-white/25 backdrop-blur-md">
             {course.badge}
           </span>
         )}
