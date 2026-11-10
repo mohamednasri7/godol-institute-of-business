@@ -3,25 +3,29 @@ import { useLocation, useParams, Link } from 'wouter';
 import {
   Star, Clock, BookOpen, CheckCircle, PlayCircle, Lock,
   Share2, Award, ChevronDown, ChevronUp, X, ShieldCheck,
-  AlertCircle, CreditCard
+  AlertCircle, CreditCard, Play, ArrowRight, Sparkles
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { auth } from '../lib/auth';
+import BunnyVideoPlayer from '../components/course/BunnyVideoPlayer';
 
 export default function CourseDetail() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
 
   const [course, setCourse] = useState(null);
+  const [modules, setModules] = useState([]);
   const [instructor, setInstructor] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState(1);
-  const [selectedLesson, setSelectedLesson] = useState(null);
+  const [activeModuleId, setActiveModuleId] = useState(null);
+
+  // Video modals
+  const [showPromoModal, setShowPromoModal] = useState(false);
+  const [previewLesson, setPreviewLesson] = useState(null);
 
   const [accessStatus, setAccessStatus] = useState(null); // null | 'approved' | 'pending_payment' | 'pending_verification'
   const [enrollment, setEnrollment] = useState(null);
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
-  const [completedLessonIds, setCompletedLessonIds] = useState([]);
   const [copiedLink, setCopiedLink] = useState(false);
 
   const handleShare = () => {
@@ -35,15 +39,33 @@ export default function CourseDetail() {
   useEffect(() => {
     if (!id) return;
     setIsLoading(true);
-    apiFetch(`/api/courses/${id}`)
-      .then(data => {
-        setCourse(data);
-        if (data.sections?.[0]?.id) setActiveSection(data.sections[0].id);
-        if (data.instructorId) {
-          apiFetch(`/api/instructors/${data.instructorId}`).then(setInstructor).catch(() => { });
+
+    apiFetch(`/api/courses/${id}/curriculum`)
+      .then((data) => {
+        setCourse(data.course);
+        setModules(data.modules || []);
+        if (data.modules && data.modules.length > 0) {
+          setActiveModuleId(data.modules[0].id);
+        }
+        if (data.course?.instructorId) {
+          apiFetch(`/api/instructors/${data.course.instructorId}`)
+            .then(setInstructor)
+            .catch(() => {});
         }
       })
-      .catch(err => console.error(err))
+      .catch((err) => {
+        console.error('Curriculum fetch error, falling back to course detail:', err);
+        apiFetch(`/api/courses/${id}`)
+          .then((courseData) => {
+            setCourse(courseData);
+            if (courseData.instructorId) {
+              apiFetch(`/api/instructors/${courseData.instructorId}`)
+                .then(setInstructor)
+                .catch(() => {});
+            }
+          })
+          .catch(console.error);
+      })
       .finally(() => setIsLoading(false));
   }, [id]);
 
@@ -52,17 +74,17 @@ export default function CourseDetail() {
     const user = auth.getUser();
     if (user && course) {
       apiFetch(`/api/enrollments/access?courseId=${course.id}&email=${encodeURIComponent(user.email)}`)
-        .then(res => {
+        .then((res) => {
           if (res.hasAccess) {
             setAccessStatus('approved');
             setEnrollment(res.enrollment);
           } else {
-            // Check if there's a pending enrollment
             apiFetch(`/api/enrollments?email=${encodeURIComponent(user.email)}`)
-              .then(enrollments => {
-                const pending = enrollments.find(e =>
-                  e.courseId === course.id &&
-                  ['pending_payment', 'pending_verification', 'pending_approval'].includes(e.enrollmentStatus)
+              .then((enrollments) => {
+                const pending = enrollments.find(
+                  (e) =>
+                    e.courseId === course.id &&
+                    ['pending_payment', 'pending_verification', 'pending_approval'].includes(e.enrollmentStatus)
                 );
                 if (pending) {
                   setAccessStatus(pending.enrollmentStatus);
@@ -70,9 +92,11 @@ export default function CourseDetail() {
                 } else {
                   setAccessStatus(null);
                 }
-              }).catch(() => { });
+              })
+              .catch(() => {});
           }
-        }).catch(() => { });
+        })
+        .catch(() => {});
     }
   }, [course]);
 
@@ -84,7 +108,7 @@ export default function CourseDetail() {
     }
 
     if (accessStatus === 'approved') {
-      setLocation('/dashboard');
+      setLocation(`/courses/${course.slug || course.id}/learn`);
       return;
     }
 
@@ -113,6 +137,7 @@ export default function CourseDetail() {
       if (res.enrollment?.accessGranted) {
         setAccessStatus('approved');
         setEnrollment(res.enrollment);
+        setLocation(`/courses/${course.slug || course.id}/learn`);
         return;
       }
 
@@ -121,24 +146,6 @@ export default function CourseDetail() {
       alert('Could not initiate enrollment: ' + (err.message || 'Please try again'));
     } finally {
       setIsStartingCheckout(false);
-    }
-  };
-
-  const toggleLessonCompleted = async (lessonId) => {
-    if (completedLessonIds.includes(lessonId)) {
-      setCompletedLessonIds(prev => prev.filter(i => i !== lessonId));
-    } else {
-      setCompletedLessonIds(prev => [...prev, lessonId]);
-      // Update progress on backend
-      if (enrollment) {
-        const allLessons = course?.sections?.flatMap(s => s.lessons) || [];
-        const newCompleted = [...completedLessonIds, lessonId];
-        const progress = Math.round((newCompleted.length / allLessons.length) * 100);
-        apiFetch(`/api/enrollments/${enrollment.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ progress })
-        }).catch(() => { });
-      }
     }
   };
 
@@ -161,46 +168,56 @@ export default function CourseDetail() {
     return (
       <div className="min-h-screen pt-36 text-center container mx-auto px-4">
         <h2 className="text-2xl font-bold mb-4">Course not found</h2>
-        <Link href="/courses" className="text-primary hover:underline font-semibold">← Back to all courses</Link>
+        <Link href="/courses" className="text-primary hover:underline font-semibold">
+          ← Back to all courses
+        </Link>
       </div>
     );
   }
 
-  const allLessons = course.sections?.flatMap(s => s.lessons) || [];
-  const progressPercent = allLessons.length > 0
-    ? Math.round((completedLessonIds.length / allLessons.length) * 100) : 0;
+  const allLessons = modules.flatMap((m) => m.lessons || []);
   const isApproved = accessStatus === 'approved';
 
   const getActionButton = () => {
     if (isApproved) {
       return (
-        <Link href="/dashboard"
-          className="w-full py-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm text-center block shadow-md transition-all">
-          Go to Student Dashboard
+        <Link
+          href={`/courses/${course.slug || course.id}/learn`}
+          className="w-full py-4 rounded-full font-bold text-sm text-center shadow-xl transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 group"
+          style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
+        >
+          <Play className="w-4 h-4 fill-current" />
+          <span>Continue Learning ({enrollment?.progress || 0}% Complete)</span>
+          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
         </Link>
       );
     }
     if (accessStatus === 'pending_verification') {
       return (
-        <div className="w-full py-3.5 rounded-full bg-amber-100 text-amber-800 font-bold text-sm text-center border border-amber-200">
-          ⏳ Payment Awaiting Verification
+        <div className="w-full py-3.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs text-center border border-amber-200">
+          ⏳ Payment Awaiting Admin Verification
         </div>
       );
     }
     if (accessStatus === 'pending_payment') {
       return (
-        <button onClick={handleEnrollClick}
+        <button
+          onClick={handleEnrollClick}
           className="w-full py-4 rounded-full font-bold text-sm shadow-xl transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
-          style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}>
+          style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
+        >
           <CreditCard className="w-5 h-5" />
           Complete Payment
         </button>
       );
     }
     return (
-      <button onClick={handleEnrollClick} disabled={isStartingCheckout}
+      <button
+        onClick={handleEnrollClick}
+        disabled={isStartingCheckout}
         className="w-full py-4 rounded-full font-bold text-sm shadow-xl transition-all hover:scale-[1.02] flex items-center justify-center gap-2 disabled:opacity-70"
-        style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}>
+        style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
+      >
         <ShieldCheck className="w-5 h-5" />
         {isStartingCheckout ? 'Preparing...' : (course.price === 0 ? 'Enroll for Free' : 'Enroll Now')}
       </button>
@@ -210,12 +227,24 @@ export default function CourseDetail() {
   return (
     <div className="min-h-screen bg-background text-foreground pb-24">
       {/* Course Header Banner */}
-      <div className="bg-[hsl(215,72%,18%)] pt-32 pb-16 text-white relative">
-        <div className="container mx-auto px-4 md:px-6">
+      <div className="bg-[hsl(215,72%,18%)] pt-32 pb-16 text-white relative overflow-hidden">
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 70% 30%, rgba(245, 166, 20, 0.4) 0%, transparent 60%)'
+          }}
+        />
+
+        <div className="container mx-auto px-4 md:px-6 relative z-10">
           <div className="flex items-center gap-2 text-xs text-white/60 mb-6">
-            <Link href="/" className="hover:text-white transition-colors">Home</Link>
+            <Link href="/" className="hover:text-white transition-colors">
+              Home
+            </Link>
             <span>/</span>
-            <Link href="/courses" className="hover:text-white transition-colors">Courses</Link>
+            <Link href="/courses" className="hover:text-white transition-colors">
+              Courses
+            </Link>
             <span>/</span>
             <span className="text-white/90 truncate max-w-xs">{course.title}</span>
           </div>
@@ -224,38 +253,64 @@ export default function CourseDetail() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-accent text-[hsl(215,72%,12%)]">
-                  {course.categoryName || 'Business'}
+                  {course.categoryName || course.category || 'Business'}
                 </span>
-                <span className="text-xs text-white/70 font-medium">{course.level || 'All Levels'}</span>
+                <span className="text-xs text-white/70 font-medium px-2.5 py-0.5 rounded-full bg-white/10">
+                  {course.level || 'All Levels'}
+                </span>
                 {course.badge && (
-                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-white/10 text-white/90">{course.badge}</span>
+                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-white/15 text-white/90">
+                    {course.badge}
+                  </span>
                 )}
               </div>
-              <button
-                onClick={handleShare}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-colors"
-                title="Share this course"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                {copiedLink ? 'Link Copied!' : 'Share'}
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowPromoModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-accent/20 hover:bg-accent/30 text-xs font-bold text-accent border border-accent/30 transition-all shadow-sm"
+                >
+                  <PlayCircle className="w-3.5 h-3.5" />
+                  <span>Watch Promo</span>
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-colors"
+                  title="Share this course"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  {copiedLink ? 'Link Copied!' : 'Share'}
+                </button>
+              </div>
             </div>
 
-            <h1 className="font-serif text-3xl md:text-5xl font-bold mb-4 leading-tight">{course.title}</h1>
-            <p className="text-white/70 text-base md:text-lg mb-6 leading-relaxed">{course.description}</p>
+            <h1 className="font-serif text-3xl md:text-5xl font-bold mb-4 leading-tight">
+              {course.title}
+            </h1>
+            <p className="text-white/70 text-base md:text-lg mb-6 leading-relaxed">
+              {course.description ||
+                'Practical business education delivered by regional founders and executives, tailored specifically for the East African commercial market.'}
+            </p>
+
             <div className="flex flex-wrap items-center gap-6 text-sm text-white/80">
               <div className="flex items-center gap-1.5">
                 <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                <span className="font-bold">{course.rating ? Number(course.rating).toFixed(1) : '5.0'}</span>
+                <span className="font-bold">
+                  {course.rating ? Number(course.rating).toFixed(1) : '5.0'}
+                </span>
                 <span className="text-white/50">({course.enrolledCount ?? 0} enrolled)</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-white/60" />
-                <span>{course.durationHours ? `${course.durationHours} hours` : 'Flexible Pace'}</span>
+                <span>
+                  {course.durationHours ? `${course.durationHours} hours` : 'Flexible Pace'}
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <BookOpen className="w-4 h-4 text-white/60" />
-                <span>{allLessons.length > 0 ? `${allLessons.length} lessons` : (course.lessonCount ? `${course.lessonCount} lessons` : 'Curriculum')}</span>
+                <span>
+                  {allLessons.length > 0 ? `${allLessons.length} lessons` : (course.lessonCount ? `${course.lessonCount} lessons` : 'Curriculum')}
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Award className="w-4 h-4 text-white/60" />
@@ -266,120 +321,131 @@ export default function CourseDetail() {
         </div>
       </div>
 
-      {/* Pending verification banner */}
-      {accessStatus === 'pending_verification' && (
-        <div className="bg-amber-50 border-b border-amber-200">
-          <div className="container mx-auto px-4 md:px-6 py-3 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-            <p className="text-sm text-amber-800">
-              <strong>Payment submitted</strong> — Your transaction is awaiting verification. Course access will be granted once your payment is confirmed.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Main Content Layout */}
       <div className="container mx-auto px-4 md:px-6 -mt-8 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-8">
-            {isApproved && (
-              <div className="bg-white border border-border rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-sm text-foreground">Your Learning Progress</span>
-                  <span className="text-sm font-bold text-primary">{progressPercent}% Completed</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
-                  <div className="bg-primary h-full transition-all duration-500 rounded-full" style={{ width: `${progressPercent}%` }} />
-                </div>
+            {/* Learning Outcomes */}
+            <div className="liquid-glass liquid-glass-squircle p-8 shadow-sm space-y-4">
+              <h2 className="font-serif text-2xl font-bold text-foreground">
+                What You'll Master in this Course
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {(course.whatYouLearn && course.whatYouLearn.length > 0
+                  ? course.whatYouLearn
+                  : [
+                      'East African market dynamics and localized product-market fit',
+                      'Financial cashflow modeling with mobile money (EVC Plus, Zaad, Sahal)',
+                      'Cross-border supply chain operations and regional trade compliance',
+                      'Executive decision frameworks and real-world cohort case studies'
+                    ]
+                ).map((item, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-foreground/80 leading-relaxed font-medium">
+                      {item}
+                    </span>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
 
-            {/* What You'll Learn */}
-            {course.whatYouLearn?.length > 0 && (
-              <div className="bg-white border border-border rounded-2xl p-8 shadow-sm">
-                <h2 className="font-serif text-2xl font-bold mb-6 text-foreground">What You'll Learn</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {course.whatYouLearn.map((item, i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-foreground/80 leading-relaxed">{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Course Requirements */}
-            {course.requirements?.length > 0 && (
-              <div className="bg-white border border-border rounded-2xl p-8 shadow-sm">
-                <h2 className="font-serif text-2xl font-bold mb-4 text-foreground">Course Requirements</h2>
-                <ul className="space-y-3">
-                  {course.requirements.map((req, i) => (
-                    <li key={i} className="flex items-start gap-3 text-sm text-foreground/80 leading-relaxed">
-                      <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                      <span>{req}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Course Syllabus */}
-            <div className="bg-white border border-border rounded-2xl p-8 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
+            {/* Structured Course Syllabus Accordion */}
+            <div className="liquid-glass liquid-glass-squircle p-8 shadow-sm space-y-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="font-serif text-2xl font-bold text-foreground">Course Syllabus</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {course.sections?.length || 0} sections • {allLessons.length} lessons
+                  <h2 className="font-serif text-2xl font-bold text-foreground">
+                    Curriculum Syllabus
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {modules.length} modules • {allLessons.length} comprehensive lessons
                   </p>
                 </div>
+                {allLessons.some((l) => l.isFreePreview) && (
+                  <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Free Previews Available
+                  </span>
+                )}
               </div>
-              {course.sections && course.sections.length > 0 ? (
+
+              {modules.length > 0 ? (
                 <div className="space-y-4">
-                  {course.sections.map(section => {
-                    const isOpen = activeSection === section.id;
+                  {modules.map((mod) => {
+                    const isOpen = activeModuleId === mod.id;
+                    const modLessons = mod.lessons || [];
+
                     return (
-                      <div key={section.id} className="border border-border rounded-xl overflow-hidden">
-                        <button onClick={() => setActiveSection(isOpen ? null : section.id)}
-                          className="w-full bg-muted/30 px-6 py-4 flex items-center justify-between text-left hover:bg-muted/50 transition-colors">
+                      <div
+                        key={mod.id}
+                        className="border border-border/80 rounded-2xl overflow-hidden bg-card/40"
+                      >
+                        <button
+                          onClick={() => setActiveModuleId(isOpen ? null : mod.id)}
+                          className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+                        >
                           <div>
-                            <h4 className="font-semibold text-foreground text-sm">{section.title}</h4>
-                            <span className="text-xs text-muted-foreground">{section.lessons?.length || 0} lessons</span>
+                            <h4 className="font-bold text-sm text-foreground">{mod.title}</h4>
+                            <span className="text-xs text-muted-foreground">
+                              {modLessons.length} lessons
+                            </span>
                           </div>
-                          {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+                          {isOpen ? (
+                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          )}
                         </button>
+
                         {isOpen && (
-                          <div className="divide-y divide-border bg-white px-6">
-                            {section.lessons?.map(lesson => {
-                              const isCompleted = completedLessonIds.includes(lesson.id);
-                              return (
-                                <div key={lesson.id} className="py-3.5 flex items-center justify-between gap-4">
-                                  <div className="flex items-center gap-3">
-                                    {isApproved ? (
-                                      <button onClick={() => toggleLessonCompleted(lesson.id)}
-                                        className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${isCompleted ? 'bg-emerald-500 text-white' : 'border border-border hover:border-primary'}`}>
-                                        {isCompleted && <CheckCircle className="w-4 h-4" />}
-                                      </button>
-                                    ) : (
-                                      <PlayCircle className="w-4 h-4 text-primary" />
-                                    )}
-                                    <span className="text-sm font-medium text-foreground">{lesson.title}</span>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-xs text-muted-foreground">{lesson.durationMinutes}m</span>
-                                    {lesson.isFree || isApproved ? (
-                                      <button onClick={() => setSelectedLesson(lesson)}
-                                        className="text-xs font-semibold px-2.5 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-                                        {lesson.isFree && !isApproved ? 'Free Preview' : 'Watch'}
-                                      </button>
-                                    ) : (
-                                      <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                          <div className="divide-y divide-border/60 bg-card/60 px-6">
+                            {modLessons.map((lesson) => (
+                              <div
+                                key={lesson.id}
+                                className="py-4 flex items-center justify-between gap-4"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <PlayCircle className="w-4 h-4 text-primary shrink-0" />
+                                  <div>
+                                    <span className="text-xs sm:text-sm font-semibold text-foreground">
+                                      {lesson.title}
+                                    </span>
+                                    {lesson.description && (
+                                      <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                                        {lesson.description}
+                                      </p>
                                     )}
                                   </div>
                                 </div>
-                              );
-                            })}
+
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className="text-xs text-muted-foreground font-mono">
+                                    {lesson.durationSeconds
+                                      ? `${Math.round(lesson.durationSeconds / 60)}m`
+                                      : '15m'}
+                                  </span>
+
+                                  {lesson.isFreePreview ? (
+                                    <button
+                                      onClick={() => setPreviewLesson(lesson)}
+                                      className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 transition-all flex items-center gap-1 border border-emerald-500/30"
+                                    >
+                                      <Play className="w-3 h-3 fill-current" />
+                                      <span>Free Preview</span>
+                                    </button>
+                                  ) : isApproved ? (
+                                    <Link
+                                      href={`/courses/${course.slug || course.id}/learn?lesson=${lesson.id}`}
+                                      className="text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                                    >
+                                      Play
+                                    </Link>
+                                  ) : (
+                                    <Lock className="w-3.5 h-3.5 text-muted-foreground/60" />
+                                  )}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -387,28 +453,36 @@ export default function CourseDetail() {
                   })}
                 </div>
               ) : (
-                <div className="text-center py-8 px-4 bg-muted/20 rounded-xl border border-dashed border-border">
-                  <BookOpen className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
-                  <p className="text-sm font-semibold text-foreground">Curriculum Outline Being Finalized</p>
+                <div className="text-center py-10 px-4 bg-muted/20 rounded-2xl border border-dashed border-border">
+                  <BookOpen className="w-10 h-10 text-muted-foreground/40 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-foreground">Curriculum Outline Being Prepared</p>
                   <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                    Lecture modules, downloadable frameworks, and coursework will be unlocked upon cohort start.
+                    Full video modules, downloadable frameworks, and coursework will be unlocked.
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Instructor Bio */}
+            {/* Instructor Profile Card */}
             {instructor && (
-              <div className="bg-white border border-border rounded-2xl p-8 shadow-sm">
-                <h3 className="font-serif text-xl font-bold mb-6 text-foreground">Your Instructor</h3>
+              <div className="liquid-glass liquid-glass-squircle p-8 shadow-sm space-y-4">
+                <h3 className="font-serif text-xl font-bold text-foreground">Your Faculty Mentor</h3>
                 <div className="flex flex-col sm:flex-row gap-6 items-start">
-                  <img src={instructor.avatar || '/instructor-1.png'} alt={instructor.name}
-                    className="w-20 h-20 rounded-full object-cover border border-border" />
+                  <img
+                    src={instructor.avatar || '/instructor-1.png'}
+                    alt={instructor.name}
+                    className="w-20 h-20 rounded-2xl object-cover border-2 border-primary/20 shadow-md shrink-0"
+                  />
                   <div>
                     <h4 className="font-bold text-lg text-foreground">{instructor.name}</h4>
-                    <p className="text-sm text-primary font-medium mb-3">{instructor.title}</p>
-                    <p className="text-sm text-muted-foreground leading-relaxed mb-4">{instructor.bio}</p>
-                    <Link href={`/instructors/${instructor.id}`} className="text-xs font-bold text-primary hover:underline">
+                    <p className="text-xs text-primary font-semibold mb-2">{instructor.title}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                      {instructor.bio}
+                    </p>
+                    <Link
+                      href={`/instructors/${instructor.id}`}
+                      className="text-xs font-bold text-primary hover:underline"
+                    >
                       View full instructor profile →
                     </Link>
                   </div>
@@ -417,52 +491,79 @@ export default function CourseDetail() {
             )}
           </div>
 
-          {/* Right Column: Sticky Pricing Card */}
+          {/* Right Column: Sticky Pricing & CTA Card */}
           <div>
-            <div className="bg-white border border-border rounded-3xl p-8 shadow-lg sticky top-24 space-y-6">
-              <div className="aspect-video rounded-2xl overflow-hidden bg-muted relative">
-                <img src={course.thumbnail || '/course-business.png'} alt={course.title} className="w-full h-full object-cover" />
+            <div className="liquid-glass liquid-glass-squircle p-8 shadow-xl sticky top-24 space-y-6 border border-white/20">
+              <div className="aspect-video rounded-2xl overflow-hidden bg-muted relative group">
+                <img
+                  src={course.thumbnailUrl || course.thumbnail || '/course-business.png'}
+                  alt={course.title}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
+                />
+                <button
+                  onClick={() => setShowPromoModal(true)}
+                  className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <div className="w-12 h-12 rounded-full bg-accent text-slate-950 flex items-center justify-center shadow-lg">
+                    <Play className="w-5 h-5 fill-current ml-0.5" />
+                  </div>
+                </button>
               </div>
+
               <div>
                 <div className="flex items-baseline gap-2 mb-1">
-                  <span className="text-3xl font-extrabold text-foreground">
+                  <span className="text-3xl font-black text-foreground">
                     {course.price === 0 ? 'Free' : `$${course.price}`}
                   </span>
                   {course.price > 0 && (
-                    <span className="text-sm text-muted-foreground line-through">${course.price + 50}</span>
+                    <span className="text-sm text-muted-foreground line-through">
+                      ${course.price + 50}
+                    </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">Full lifetime access with certificate</p>
+                <p className="text-xs text-muted-foreground">Full lifetime access with accredited certificate</p>
               </div>
 
               {getActionButton()}
 
               <a
-                href={`https://wa.me/252905139816?text=${encodeURIComponent(`Hi Godol Institute, I have questions regarding the "${course.title}" program.`)}`}
+                href={`https://wa.me/252905139816?text=${encodeURIComponent(
+                  `Hi Godol Institute, I have questions regarding the "${course.title}" program.`
+                )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-2.5 rounded-full border border-emerald-500/30 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold text-xs text-center flex items-center justify-center gap-1.5 transition-colors"
+                className="w-full py-2.5 rounded-full border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 font-semibold text-xs text-center flex items-center justify-center gap-1.5 transition-colors"
               >
                 <span>Ask Admissions on WhatsApp</span>
               </a>
 
-              <div className="space-y-3 pt-4 border-t border-border text-sm">
-                <div className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">This course includes:</div>
-                <div className="flex items-center gap-3 text-xs text-foreground/80">
+              <div className="space-y-3 pt-4 border-t border-border/80 text-xs text-muted-foreground">
+                <div className="font-bold uppercase tracking-wider text-foreground text-[11px]">
+                  This course includes:
+                </div>
+                <div className="flex items-center gap-2.5">
                   <Clock className="w-4 h-4 text-primary" />
-                  <span>{course.durationHours ? `${course.durationHours} hours of practical training` : 'Comprehensive curriculum'}</span>
+                  <span>
+                    {course.durationHours
+                      ? `${course.durationHours} hours on-demand training`
+                      : 'Comprehensive modular curriculum'}
+                  </span>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-foreground/80">
+                <div className="flex items-center gap-2.5">
                   <BookOpen className="w-4 h-4 text-primary" />
-                  <span>{allLessons.length > 0 ? `${allLessons.length} structured practical lessons` : 'Structured modular syllabus'}</span>
+                  <span>
+                    {allLessons.length > 0
+                      ? `${allLessons.length} practical lessons`
+                      : 'Structured video modules'}
+                  </span>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-foreground/80">
+                <div className="flex items-center gap-2.5">
                   <Award className="w-4 h-4 text-primary" />
                   <span>Accredited Certificate of Completion</span>
                 </div>
-                <div className="flex items-center gap-3 text-xs text-foreground/80">
+                <div className="flex items-center gap-2.5">
                   <ShieldCheck className="w-4 h-4 text-primary" />
-                  <span>Local mobile money: EVC Plus, Zaad, Sahal, Premier</span>
+                  <span>EVC Plus, Zaad, Sahal, and Premier Wallet support</span>
                 </div>
               </div>
             </div>
@@ -470,37 +571,74 @@ export default function CourseDetail() {
         </div>
       </div>
 
-      {/* Lesson Video Modal */}
-      {selectedLesson && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl overflow-hidden max-w-3xl w-full shadow-2xl">
-            <div className="bg-primary text-primary-foreground p-5 flex items-center justify-between">
-              <h3 className="font-bold text-base">{selectedLesson.title}</h3>
-              <button onClick={() => setSelectedLesson(null)} className="text-white/70 hover:text-white">
+      {/* Bunny Stream Promo Video Modal */}
+      {showPromoModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="liquid-glass-modal max-w-3xl w-full rounded-3xl overflow-hidden shadow-2xl border border-white/20">
+            <div className="p-4 bg-slate-900 border-b border-white/10 flex items-center justify-between text-white">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-accent animate-ping" />
+                <h3 className="font-bold text-sm truncate max-w-md">
+                  Course Promo: {course.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowPromoModal(false)}
+                className="text-white/60 hover:text-white p-1 rounded-lg"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="aspect-video bg-black flex items-center justify-center">
-              {selectedLesson.videoUrl ? (
-                <iframe src={selectedLesson.videoUrl} title={selectedLesson.title}
-                  className="w-full h-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-              ) : (
-                <div className="text-white text-center p-6">
-                  <PlayCircle className="w-16 h-16 mx-auto mb-3 text-accent" />
-                  <p className="text-base font-semibold">{selectedLesson.title}</p>
-                  <p className="text-xs text-white/50 mt-1">Video will be uploaded soon.</p>
-                </div>
-              )}
+            <div className="p-4 bg-black">
+              <BunnyVideoPlayer
+                videoId={course.promoVideoId || course.promo_video_id || 'bunny_promo_masterclass'}
+                title={`${course.title} - Official Promo`}
+                autoPlay={true}
+              />
             </div>
-            <div className="p-6">
-              <p className="text-sm text-foreground/80 leading-relaxed mb-4">{selectedLesson.content || 'Comprehensive business frameworks and practical guidance.'}</p>
-              <div className="flex justify-end gap-3">
-                <button onClick={() => { toggleLessonCompleted(selectedLesson.id); setSelectedLesson(null); }}
-                  className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors">
-                  Mark as Completed
-                </button>
+          </div>
+        </div>
+      )}
+
+      {/* Free Preview Video Modal */}
+      {previewLesson && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="liquid-glass-modal max-w-3xl w-full rounded-3xl overflow-hidden shadow-2xl border border-white/20">
+            <div className="p-4 bg-slate-900 border-b border-white/10 flex items-center justify-between text-white">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase">
+                  Free Preview
+                </span>
+                <h3 className="font-bold text-sm truncate max-w-md">{previewLesson.title}</h3>
               </div>
+              <button
+                onClick={() => setPreviewLesson(null)}
+                className="text-white/60 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 bg-black">
+              <BunnyVideoPlayer
+                videoId={previewLesson.bunnyVideoId || previewLesson.bunny_video_id}
+                title={previewLesson.title}
+                autoPlay={true}
+              />
+            </div>
+            <div className="p-6 bg-slate-950 text-white flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/10">
+              <p className="text-xs text-white/70">
+                Enjoyed this preview? Enroll now to unlock all {allLessons.length} lessons, downloadable templates, and accredited certification.
+              </p>
+              <button
+                onClick={() => {
+                  setPreviewLesson(null);
+                  handleEnrollClick();
+                }}
+                className="px-6 py-2.5 rounded-full text-xs font-bold shrink-0 transition-transform hover:scale-105"
+                style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
+              >
+                Unlock Full Course
+              </button>
             </div>
           </div>
         </div>

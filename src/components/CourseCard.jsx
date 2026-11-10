@@ -34,7 +34,7 @@ export default function CourseCard({ course }) {
 
   return (
     <Link
-      href={`/courses/${course.id}`}
+      href={`/courses/${course.slug || course.id}`}
       className="group flex flex-col h-full liquid-glass liquid-glass-squircle liquid-glass-interactive overflow-hidden cursor-pointer"
     >
       <div className="relative aspect-video overflow-hidden bg-muted/60">

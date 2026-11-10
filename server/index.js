@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { initialData } from './data.js';
 import { supabase, isSupabaseConfigured } from './supabase.js';
+import { createBunnyRouter } from './bunny.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,6 +76,119 @@ function loadDB() {
       }
     });
 
+    // Ensure course curriculum, enrollments, progress, notes, and discussions exist
+    if (!data.course_modules) data.course_modules = [];
+    if (!data.course_lessons) data.course_lessons = [];
+    if (!data.course_enrollments) data.course_enrollments = [];
+    if (!data.lesson_progress) data.lesson_progress = [];
+    if (!data.lesson_notes) data.lesson_notes = [];
+    if (!data.lesson_discussions) data.lesson_discussions = [];
+
+    // Ensure courses have proper slugs, promo_video_id, and default curriculum if empty
+    (data.courses || []).forEach(c => {
+      if (!c.slug) {
+        c.slug = (c.title || `course-${c.id}`).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      }
+      if (!c.promoVideoId && !c.promo_video_id) {
+        c.promoVideoId = 'bunny_promo_masterclass';
+      }
+      if (!c.thumbnailUrl && !c.thumbnail_url) {
+        c.thumbnailUrl = c.thumbnail || '/course-business.png';
+      }
+
+      const existingModules = data.course_modules.filter(m => (m.courseId === c.id || m.course_id === c.id));
+      if (existingModules.length === 0) {
+        const mod1 = {
+          id: data.course_modules.length + 1,
+          courseId: c.id,
+          title: 'Module 1: Regional Market Analysis & Strategy',
+          sortOrder: 1,
+          createdAt: new Date().toISOString()
+        };
+        const mod2 = {
+          id: data.course_modules.length + 2,
+          courseId: c.id,
+          title: 'Module 2: Financial Modeling & Mobile Payments',
+          sortOrder: 2,
+          createdAt: new Date().toISOString()
+        };
+        const mod3 = {
+          id: data.course_modules.length + 3,
+          courseId: c.id,
+          title: 'Module 3: Operations & Executive Leadership',
+          sortOrder: 3,
+          createdAt: new Date().toISOString()
+        };
+        data.course_modules.push(mod1, mod2, mod3);
+
+        data.course_lessons.push(
+          {
+            id: data.course_lessons.length + 1,
+            moduleId: mod1.id,
+            courseId: c.id,
+            title: 'Foundations of East African Commerce',
+            description: 'Understanding macroeconomic conditions, shipping corridors, and regulatory frameworks across Somalia.',
+            bunnyVideoId: 'bunny_lesson_foundations',
+            bunnyLibraryId: process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+            durationSeconds: 720,
+            resourceUrls: [
+              { title: 'Regional Commercial Guide.pdf', url: 'https://godol-cdn.b-cdn.net/materials/commercial-guide.pdf', size: '2.4 MB' },
+              { title: 'Course Syllabus & Reading List.pdf', url: 'https://godol-cdn.b-cdn.net/materials/syllabus.pdf', size: '1.2 MB' }
+            ],
+            isFreePreview: true,
+            sortOrder: 1,
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: data.course_lessons.length + 2,
+            moduleId: mod1.id,
+            courseId: c.id,
+            title: 'Customer Segmentation & Local Demand Modeling',
+            description: 'Analyzing high-velocity trade in Bosaso, Mogadishu, and Hargeisa to locate underserved customer segments.',
+            bunnyVideoId: 'bunny_lesson_segmentation',
+            bunnyLibraryId: process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+            durationSeconds: 840,
+            resourceUrls: [],
+            isFreePreview: false,
+            sortOrder: 2,
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: data.course_lessons.length + 3,
+            moduleId: mod2.id,
+            courseId: c.id,
+            title: 'Navigating Dual-Currency Realities & Mobile Payments',
+            description: 'Practical financial modeling with EVC Plus, Zaad, Sahal, and USD foreign exchange buffering.',
+            bunnyVideoId: 'bunny_lesson_payments',
+            bunnyLibraryId: process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+            durationSeconds: 960,
+            resourceUrls: [
+              { title: 'EVC_Zaad_Cashflow_Template.xlsx', url: 'https://godol-cdn.b-cdn.net/materials/cashflow-model.xlsx', size: '850 KB' }
+            ],
+            isFreePreview: false,
+            sortOrder: 1,
+            createdAt: new Date().toISOString()
+          },
+          {
+            id: data.course_lessons.length + 4,
+            moduleId: mod3.id,
+            courseId: c.id,
+            title: 'Executive Decision Making & Capstone Case Study',
+            description: 'Final strategic evaluation, governance structures, and capstone presentation frameworks.',
+            bunnyVideoId: 'bunny_lesson_capstone',
+            bunnyLibraryId: process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+            durationSeconds: 1080,
+            resourceUrls: [
+              { title: 'Godol Executive Capstone Brief.pdf', url: 'https://godol-cdn.b-cdn.net/materials/capstone-brief.pdf', size: '3.1 MB' }
+            ],
+            isFreePreview: false,
+            sortOrder: 1,
+            createdAt: new Date().toISOString()
+          }
+        );
+      }
+    });
+
     memoryDB = data;
     return data;
   } catch (err) {
@@ -86,7 +200,13 @@ function loadDB() {
 // Whitelist of valid PostgreSQL columns per table to avoid PostgREST schema cache errors
 const TABLE_COLUMNS = {
   instructors: ['id', 'name', 'title', 'bio', 'avatar', 'email', 'phone', 'rating', 'review_count', 'student_count', 'course_count', 'status', 'joined_at'],
-  courses: ['id', 'title', 'slug', 'description', 'price', 'level', 'duration_hours', 'lesson_count', 'enrolled_count', 'rating', 'featured', 'badge', 'thumbnail', 'instructor_id', 'instructor_name', 'category_id', 'category_name', 'status', 'approval_status', 'what_you_learn', 'requirements', 'sections', 'created_at'],
+  courses: ['id', 'title', 'slug', 'description', 'price', 'level', 'duration_hours', 'lesson_count', 'enrolled_count', 'rating', 'featured', 'badge', 'thumbnail', 'thumbnail_url', 'promo_video_id', 'is_published', 'category', 'instructor_id', 'instructor_name', 'category_id', 'category_name', 'status', 'approval_status', 'what_you_learn', 'requirements', 'sections', 'created_at'],
+  course_modules: ['id', 'course_id', 'title', 'sort_order', 'created_at'],
+  course_lessons: ['id', 'module_id', 'course_id', 'title', 'description', 'bunny_video_id', 'bunny_library_id', 'duration_seconds', 'resource_urls', 'is_free_preview', 'sort_order', 'created_at'],
+  course_enrollments: ['id', 'user_id', 'course_id', 'enrolled_at', 'completed_at', 'last_accessed_lesson_id', 'created_at'],
+  lesson_progress: ['id', 'user_id', 'course_id', 'lesson_id', 'is_completed', 'watched_seconds', 'updated_at'],
+  lesson_notes: ['id', 'user_id', 'lesson_id', 'video_timestamp_seconds', 'content', 'created_at'],
+  lesson_discussions: ['id', 'lesson_id', 'user_id', 'user_name', 'user_email', 'content', 'created_at'],
   categories: ['id', 'name', 'icon', 'color', 'course_count'],
   enrollments: ['id', 'student_name', 'student_email', 'student_phone', 'course_id', 'course_title', 'course_price', 'payment_id', 'payment_status', 'enrollment_status', 'access_granted', 'access_granted_at', 'progress', 'enrolled_at', 'approved_at', 'approved_by', 'rejection_reason'],
   payments: ['id', 'enrollment_id', 'course_id', 'course_title', 'course_price', 'student_name', 'student_email', 'student_phone', 'student_whatsapp', 'provider', 'sender_phone', 'transaction_ref', 'claimed_amount', 'verified_amount', 'currency', 'status', 'payment_date', 'submitted_at', 'verified_at', 'verified_by', 'rejected_at', 'rejected_by', 'rejection_reason', 'admin_notes', 'receipt_url'],
@@ -145,7 +265,13 @@ const LOCAL_TO_SUPABASE = {
   blog: 'blog_posts',
   students: 'profiles',
   audit_logs: 'audit_logs',
-  notifications: 'notifications'
+  notifications: 'notifications',
+  course_modules: 'course_modules',
+  course_lessons: 'course_lessons',
+  course_enrollments: 'course_enrollments',
+  lesson_progress: 'lesson_progress',
+  lesson_notes: 'lesson_notes',
+  lesson_discussions: 'lesson_discussions'
 };
 
 // Generic sync of any table to Supabase
@@ -509,6 +635,9 @@ export function createApiRouter() {
   const router = express.Router();
   router.use(express.json({ limit: '25mb' }));
 
+  // Bunny.net Stream & Storage CDN Router
+  router.use('/bunny', createBunnyRouter());
+
   // Auto-sync middleware: for any GET request, if it's been > 2.5s since last sync,
   // pull latest changes from Supabase so the dashboard and website always show the newest data
   router.use(async (req, res, next) => {
@@ -640,6 +769,429 @@ export function createApiRouter() {
     if (!course) return res.json([]);
     const firstLessonId = course.sections?.[0]?.lessons?.[0]?.id;
     res.json(firstLessonId ? [{ lessonId: firstLessonId, completed: true }] : []);
+  });
+
+  // ─────────── INTERACTIVE COURSE CURRICULUM & LEARNING PLAYER ───────────
+
+  // Get full structured curriculum (modules + lessons) for a course
+  router.get('/courses/:id/curriculum', (req, res) => {
+    const db = loadDB();
+    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
+    const modules = (db.course_modules || [])
+      .filter(m => (m.courseId === course.id || m.course_id === course.id))
+      .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
+      .map(mod => {
+        const lessons = (db.course_lessons || [])
+          .filter(l => (l.moduleId === mod.id || l.module_id === mod.id))
+          .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1));
+        return {
+          ...mod,
+          lessons
+        };
+      });
+
+    res.json({
+      course,
+      modules
+    });
+  });
+
+  // Course Stats (Enrolled counts & average completion rates)
+  router.get('/courses/:id/stats', (req, res) => {
+    const db = loadDB();
+    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
+    const courseEnrollments = (db.enrollments || []).filter(e => (e.courseId === course.id || e.course_id === course.id) && (e.accessGranted || e.enrollmentStatus === 'approved'));
+    const totalEnrolled = courseEnrollments.length;
+    const completedCount = courseEnrollments.filter(e => Number(e.progress) >= 100).length;
+    const avgProgress = totalEnrolled > 0
+      ? Math.round(courseEnrollments.reduce((acc, e) => acc + (Number(e.progress) || 0), 0) / totalEnrolled)
+      : 0;
+
+    res.json({
+      courseId: course.id,
+      totalEnrolled,
+      completedCount,
+      avgProgress
+    });
+  });
+
+  // Add a new module
+  router.post('/courses/:id/modules', async (req, res) => {
+    const db = loadDB();
+    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
+    const { title, sortOrder } = req.body;
+    const newModule = {
+      id: db.course_modules.length > 0 ? Math.max(...db.course_modules.map(m => m.id)) + 1 : 1,
+      courseId: course.id,
+      title: title || 'New Module',
+      sortOrder: sortOrder || (db.course_modules.filter(m => m.courseId === course.id).length + 1),
+      createdAt: new Date().toISOString()
+    };
+
+    db.course_modules.push(newModule);
+    saveDB(db);
+
+    if (isSupabaseConfigured && supabase) {
+      await syncRecordToSupabase('course_modules', newModule);
+    }
+
+    res.status(201).json(newModule);
+  });
+
+  // Update a module
+  router.put('/courses/:id/modules/:moduleId', async (req, res) => {
+    const db = loadDB();
+    const modId = Number(req.params.moduleId);
+    const modIndex = db.course_modules.findIndex(m => m.id === modId);
+    if (modIndex === -1) return res.status(404).json({ error: 'Module not found' });
+
+    const updated = {
+      ...db.course_modules[modIndex],
+      ...req.body
+    };
+    db.course_modules[modIndex] = updated;
+    saveDB(db);
+
+    if (isSupabaseConfigured && supabase) {
+      await syncRecordToSupabase('course_modules', updated);
+    }
+
+    res.json(updated);
+  });
+
+  // Delete a module
+  router.delete('/courses/:id/modules/:moduleId', async (req, res) => {
+    const db = loadDB();
+    const modId = Number(req.params.moduleId);
+    db.course_modules = db.course_modules.filter(m => m.id !== modId);
+    db.course_lessons = db.course_lessons.filter(l => l.moduleId !== modId && l.module_id !== modId);
+    saveDB(db);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('course_modules').delete().eq('id', modId);
+      } catch {}
+    }
+
+    res.json({ success: true, deletedModuleId: modId });
+  });
+
+  // Add a new lesson to a module
+  router.post('/courses/:id/modules/:moduleId/lessons', async (req, res) => {
+    const db = loadDB();
+    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
+    const modId = Number(req.params.moduleId);
+    const {
+      title,
+      description,
+      bunnyVideoId,
+      bunnyLibraryId,
+      durationSeconds,
+      resourceUrls,
+      isFreePreview,
+      sortOrder
+    } = req.body;
+
+    const newLesson = {
+      id: db.course_lessons.length > 0 ? Math.max(...db.course_lessons.map(l => l.id)) + 1 : 1,
+      moduleId: modId,
+      courseId: course.id,
+      title: title || 'New Lesson',
+      description: description || '',
+      bunnyVideoId: bunnyVideoId || '',
+      bunnyLibraryId: bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+      durationSeconds: Number(durationSeconds) || 600,
+      resourceUrls: Array.isArray(resourceUrls) ? resourceUrls : [],
+      isFreePreview: Boolean(isFreePreview),
+      sortOrder: sortOrder || (db.course_lessons.filter(l => l.moduleId === modId).length + 1),
+      createdAt: new Date().toISOString()
+    };
+
+    db.course_lessons.push(newLesson);
+    saveDB(db);
+
+    if (isSupabaseConfigured && supabase) {
+      await syncRecordToSupabase('course_lessons', newLesson);
+    }
+
+    res.status(201).json(newLesson);
+  });
+
+  // Update a lesson
+  router.put('/lessons/:lessonId', async (req, res) => {
+    const db = loadDB();
+    const lessonId = Number(req.params.lessonId);
+    const lIndex = db.course_lessons.findIndex(l => l.id === lessonId);
+    if (lIndex === -1) return res.status(404).json({ error: 'Lesson not found' });
+
+    const updated = {
+      ...db.course_lessons[lIndex],
+      ...req.body
+    };
+    db.course_lessons[lIndex] = updated;
+    saveDB(db);
+
+    if (isSupabaseConfigured && supabase) {
+      await syncRecordToSupabase('course_lessons', updated);
+    }
+
+    res.json(updated);
+  });
+
+  // Delete a lesson
+  router.delete('/lessons/:lessonId', async (req, res) => {
+    const db = loadDB();
+    const lessonId = Number(req.params.lessonId);
+    db.course_lessons = db.course_lessons.filter(l => l.id !== lessonId);
+    saveDB(db);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('course_lessons').delete().eq('id', lessonId);
+      } catch {}
+    }
+
+    res.json({ success: true, deletedLessonId: lessonId });
+  });
+
+  // Player State (Enrollment check, lesson progress, notes)
+  router.get('/courses/:id/player-state', (req, res) => {
+    const db = loadDB();
+    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
+    const userEmail = (req.query.email || req.query.user_email || req.query.user_id || '').toLowerCase();
+    const enrollment = (db.enrollments || []).find(e =>
+      e.courseId === course.id &&
+      (e.studentEmail?.toLowerCase() === userEmail || e.student_email?.toLowerCase() === userEmail) &&
+      (e.accessGranted || e.enrollmentStatus === 'approved')
+    );
+
+    const allLessons = db.course_lessons.filter(l => l.courseId === course.id || l.course_id === course.id);
+    const userProgress = (db.lesson_progress || []).filter(p =>
+      (p.userId === userEmail || p.user_id === userEmail) &&
+      (p.courseId === course.id || p.course_id === course.id)
+    );
+
+    const completedLessons = userProgress.filter(p => p.isCompleted || p.is_completed).map(p => p.lessonId || p.lesson_id);
+    const progressPercent = allLessons.length > 0
+      ? Math.round((completedLessons.length / allLessons.length) * 100)
+      : (enrollment ? enrollment.progress || 0 : 0);
+
+    const notes = (db.lesson_notes || []).filter(n =>
+      (n.userId === userEmail || n.user_id === userEmail) &&
+      allLessons.some(l => l.id === (n.lessonId || n.lesson_id))
+    );
+
+    // Last accessed lesson
+    const cEnrollment = (db.course_enrollments || []).find(ce =>
+      (ce.userId === userEmail || ce.user_id === userEmail) &&
+      (ce.courseId === course.id || ce.course_id === course.id)
+    );
+
+    res.json({
+      hasAccess: Boolean(enrollment || course.price === 0),
+      enrollment: enrollment || null,
+      lastAccessedLessonId: cEnrollment?.lastAccessedLessonId || cEnrollment?.last_accessed_lesson_id || allLessons[0]?.id || null,
+      progressPercent,
+      completedLessonIds: completedLessons,
+      lessonProgress: userProgress,
+      notes
+    });
+  });
+
+  // Update Lesson Progress (Watched seconds, completed flag)
+  router.post('/courses/:id/lessons/:lessonId/progress', async (req, res) => {
+    const db = loadDB();
+    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
+    if (!course) return res.status(404).json({ error: 'Course not found' });
+
+    const lessonId = Number(req.params.lessonId);
+    const { user_id, user_email, is_completed, watched_seconds } = req.body;
+    const userId = (user_email || user_id || 'anonymous').toLowerCase();
+
+    let recordIndex = db.lesson_progress.findIndex(p =>
+      (p.userId === userId || p.user_id === userId) &&
+      (p.lessonId === lessonId || p.lesson_id === lessonId)
+    );
+
+    const updatedRecord = {
+      id: recordIndex >= 0 ? db.lesson_progress[recordIndex].id : (db.lesson_progress.length + 1),
+      userId,
+      courseId: course.id,
+      lessonId,
+      isCompleted: is_completed !== undefined ? Boolean(is_completed) : (recordIndex >= 0 ? db.lesson_progress[recordIndex].isCompleted : false),
+      watchedSeconds: Number(watched_seconds) || (recordIndex >= 0 ? db.lesson_progress[recordIndex].watchedSeconds : 0),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (recordIndex >= 0) {
+      db.lesson_progress[recordIndex] = updatedRecord;
+    } else {
+      db.lesson_progress.push(updatedRecord);
+    }
+
+    // Update or insert into course_enrollments
+    let ceIndex = db.course_enrollments.findIndex(ce =>
+      (ce.userId === userId || ce.user_id === userId) &&
+      (ce.courseId === course.id || ce.course_id === course.id)
+    );
+
+    const ceRecord = {
+      id: ceIndex >= 0 ? db.course_enrollments[ceIndex].id : (db.course_enrollments.length + 1),
+      userId,
+      courseId: course.id,
+      lastAccessedLessonId: lessonId,
+      enrolledAt: ceIndex >= 0 ? db.course_enrollments[ceIndex].enrolledAt : new Date().toISOString()
+    };
+
+    if (ceIndex >= 0) {
+      db.course_enrollments[ceIndex] = { ...db.course_enrollments[ceIndex], ...ceRecord };
+    } else {
+      db.course_enrollments.push(ceRecord);
+    }
+
+    // Recalculate overall course progress
+    const allCourseLessons = db.course_lessons.filter(l => l.courseId === course.id || l.course_id === course.id);
+    const userCompletedCount = db.lesson_progress.filter(p =>
+      (p.userId === userId || p.user_id === userId) &&
+      (p.courseId === course.id || p.course_id === course.id) &&
+      p.isCompleted
+    ).length;
+
+    const progressPercent = allCourseLessons.length > 0
+      ? Math.round((userCompletedCount / allCourseLessons.length) * 100)
+      : 0;
+
+    // Update main enrollments table progress
+    const mainEnrollment = db.enrollments.find(e =>
+      e.courseId === course.id &&
+      (e.studentEmail?.toLowerCase() === userId || e.student_email?.toLowerCase() === userId)
+    );
+    if (mainEnrollment) {
+      mainEnrollment.progress = progressPercent;
+      if (progressPercent >= 100 && !mainEnrollment.completedAt) {
+        mainEnrollment.completedAt = new Date().toISOString();
+        mainEnrollment.enrollmentStatus = 'completed';
+      }
+    }
+
+    saveDB(db);
+
+    if (isSupabaseConfigured && supabase) {
+      await syncRecordToSupabase('lesson_progress', updatedRecord);
+      await syncRecordToSupabase('course_enrollments', ceRecord);
+      if (mainEnrollment) {
+        await syncRecordToSupabase('enrollments', mainEnrollment);
+      }
+    }
+
+    res.json({
+      success: true,
+      progress: updatedRecord,
+      progressPercent,
+      completedLessonsCount: userCompletedCount,
+      totalLessonsCount: allCourseLessons.length
+    });
+  });
+
+  // Get notes for a lesson
+  router.get('/lessons/:lessonId/notes', (req, res) => {
+    const db = loadDB();
+    const lessonId = Number(req.params.lessonId);
+    const userId = (req.query.user_id || req.query.email || '').toLowerCase();
+    const notes = (db.lesson_notes || []).filter(n =>
+      (n.lessonId === lessonId || n.lesson_id === lessonId) &&
+      (!userId || n.userId === userId || n.user_id === userId)
+    );
+    res.json(notes);
+  });
+
+  // Post a timestamped note
+  router.post('/lessons/:lessonId/notes', async (req, res) => {
+    const db = loadDB();
+    const lessonId = Number(req.params.lessonId);
+    const { user_id, user_email, video_timestamp_seconds, content } = req.body;
+    if (!content || !content.trim()) return res.status(400).json({ error: 'Note content is required' });
+
+    const newNote = {
+      id: db.lesson_notes.length > 0 ? Math.max(...db.lesson_notes.map(n => n.id)) + 1 : 1,
+      userId: (user_email || user_id || 'student').toLowerCase(),
+      lessonId,
+      videoTimestampSeconds: Number(video_timestamp_seconds) || 0,
+      content: content.trim(),
+      createdAt: new Date().toISOString()
+    };
+
+    db.lesson_notes.push(newNote);
+    saveDB(db);
+
+    if (isSupabaseConfigured && supabase) {
+      await syncRecordToSupabase('lesson_notes', newNote);
+    }
+
+    res.status(201).json(newNote);
+  });
+
+  // Delete a note
+  router.delete('/notes/:noteId', async (req, res) => {
+    const db = loadDB();
+    const noteId = Number(req.params.noteId);
+    db.lesson_notes = db.lesson_notes.filter(n => n.id !== noteId);
+    saveDB(db);
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('lesson_notes').delete().eq('id', noteId);
+      } catch {}
+    }
+
+    res.json({ success: true, deletedNoteId: noteId });
+  });
+
+  // Get Discussions for a lesson
+  router.get('/lessons/:lessonId/discussions', (req, res) => {
+    const db = loadDB();
+    const lessonId = Number(req.params.lessonId);
+    const discussions = (db.lesson_discussions || []).filter(d =>
+      d.lessonId === lessonId || d.lesson_id === lessonId
+    );
+    res.json(discussions);
+  });
+
+  // Post Discussion for a lesson
+  router.post('/lessons/:lessonId/discussions', async (req, res) => {
+    const db = loadDB();
+    const lessonId = Number(req.params.lessonId);
+    const { user_id, user_name, user_email, content } = req.body;
+    if (!content || !content.trim()) return res.status(400).json({ error: 'Comment content is required' });
+
+    const newDiscussion = {
+      id: db.lesson_discussions.length > 0 ? Math.max(...db.lesson_discussions.map(d => d.id)) + 1 : 1,
+      lessonId,
+      userId: (user_email || user_id || 'student').toLowerCase(),
+      userName: user_name || 'Ambitious Professional',
+      userEmail: user_email || '',
+      content: content.trim(),
+      createdAt: new Date().toISOString()
+    };
+
+    db.lesson_discussions.push(newDiscussion);
+    saveDB(db);
+
+    if (isSupabaseConfigured && supabase) {
+      await syncRecordToSupabase('lesson_discussions', newDiscussion);
+    }
+
+    res.status(201).json(newDiscussion);
   });
 
   // Categories

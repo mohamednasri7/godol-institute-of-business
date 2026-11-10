@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Search, Plus, Edit2, Trash2, CheckCircle, XCircle,
   Eye, BookOpen, X, Star, Users, Filter, Upload, Download,
-  Archive
+  Archive, Play
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
@@ -250,7 +250,16 @@ export default function AdminCourses() {
                             <button onClick={() => handleReject(c)} className="px-2.5 py-1.5 bg-red-500 text-white rounded-lg text-[11px] font-bold hover:bg-red-600">Reject</button>
                           </>
                         )}
-                        <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-primary rounded-lg hover:bg-gray-100" title="Edit syllabus"><Edit2 className="w-4 h-4" /></button>
+                        <a
+                          href={`/courses/${c.slug || c.id}/learn`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 text-amber-500 hover:text-amber-600 rounded-lg hover:bg-gray-100"
+                          title="Open Course Learning Player"
+                        >
+                          <Play className="w-4 h-4 fill-current" />
+                        </a>
+                        <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-primary rounded-lg hover:bg-gray-100" title="Edit course"><Edit2 className="w-4 h-4" /></button>
                         <button onClick={() => handleArchive(c)} className="p-1.5 text-gray-400 hover:text-amber-600 rounded-lg hover:bg-gray-100" title="Archive course"><Archive className="w-4 h-4" /></button>
                         <button onClick={() => handleDelete(c)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100" title="Permanently delete"><Trash2 className="w-4 h-4" /></button>
                         <button onClick={() => toggleFeatured(c)} className={`p-1.5 rounded-lg hover:bg-gray-100 ${c.featured ? 'text-amber-500' : 'text-gray-300 hover:text-amber-500'}`} title="Toggle featured">

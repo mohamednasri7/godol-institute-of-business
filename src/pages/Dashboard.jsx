@@ -237,12 +237,12 @@ export default function Dashboard() {
                     +10% Practice Progress
                   </button>
                   <Link
-                    href={`/courses/${activeCourse.courseId}`}
+                    href={`/courses/${activeCourse.courseSlug || activeCourse.courseId}/learn?lesson=${activeCourse.lastAccessedLessonId || ''}`}
                     className="inline-flex items-center gap-2 px-6 py-3 rounded-full font-bold text-xs shadow-lg transition-transform hover:scale-105"
                     style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
                   >
                     <Play className="w-4 h-4 fill-current" />
-                    <span>Open Classroom</span>
+                    <span>Resume Lesson ({activeCourse.progress}%)</span>
                   </Link>
                 </div>
               </div>
@@ -255,7 +255,7 @@ export default function Dashboard() {
               </h3>
 
               {enrollments.length === 0 ? (
-                <div className="bg-white border border-border rounded-2xl p-12 text-center max-w-md mx-auto">
+                <div className="liquid-glass rounded-2xl p-12 text-center max-w-md mx-auto">
                   <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
                   <h4 className="font-bold text-base text-foreground mb-1">
                     No active courses yet
@@ -275,17 +275,17 @@ export default function Dashboard() {
                   {enrollments.map((enr) => (
                     <div
                       key={enr.id}
-                      className="bg-white border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-between"
+                      className="liquid-glass liquid-glass-squircle liquid-glass-interactive p-6 shadow-sm flex flex-col justify-between"
                     >
                       <div>
                         <div className="flex items-center justify-between mb-3">
                           <span
                             className={`text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${enr.progress === 100
-                              ? 'bg-green-100 text-green-700'
+                              ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/20'
                               : 'bg-primary/10 text-primary'
                               }`}
                           >
-                            {enr.progress === 100 ? 'Completed' : 'Active'}
+                            {enr.progress === 100 ? 'Completed ✓' : 'Active Progress'}
                           </span>
                           <span className="text-xs font-bold text-foreground">
                             {enr.progress}%
@@ -296,27 +296,29 @@ export default function Dashboard() {
                           {enr.courseTitle}
                         </h4>
 
-                        <div className="w-full bg-muted h-2 rounded-full overflow-hidden mb-6">
+                        <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden mb-6">
                           <div
-                            className="bg-primary h-full transition-all duration-300"
+                            className="bg-accent h-full transition-all duration-300 rounded-full"
                             style={{ width: `${enr.progress}%` }}
                           />
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between pt-4 border-t border-border gap-2">
-                        <button
-                          onClick={() => handleIncrementProgress(enr.id, enr.progress)}
-                          className="text-xs text-muted-foreground hover:text-foreground underline"
-                        >
-                          +10% Progress
-                        </button>
-
+                      <div className="flex items-center justify-between pt-4 border-t border-border/80 gap-2">
                         <Link
                           href={`/courses/${enr.courseId}`}
-                          className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+                          className="text-xs text-muted-foreground hover:text-foreground underline"
                         >
-                          Go to Course
+                          Overview
+                        </Link>
+
+                        <Link
+                          href={`/courses/${enr.courseSlug || enr.courseId}/learn?lesson=${enr.lastAccessedLessonId || ''}`}
+                          className="px-4 py-2 rounded-full text-xs font-bold transition-transform hover:scale-105 flex items-center gap-1.5"
+                          style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Resume Lesson</span>
                         </Link>
                       </div>
                     </div>

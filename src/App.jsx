@@ -9,6 +9,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Home from './pages/Home';
 import Courses from './pages/Courses';
 import CourseDetail from './pages/CourseDetail';
+import CoursePlayer from './pages/CoursePlayer';
 import Checkout from './pages/Checkout';
 import Categories from './pages/Categories';
 import Instructors from './pages/Instructors';
@@ -104,6 +105,9 @@ export default function App() {
         <Route path="/courses">
           <Layout><Courses /></Layout>
         </Route>
+        <Route path="/courses/:slug/learn" component={CoursePlayer} />
+        <Route path="/courses/:id/learn" component={CoursePlayer} />
+        <Route path="/learn/:slug" component={CoursePlayer} />
         <Route path="/courses/:id">
           <Layout><CourseDetail /></Layout>
         </Route>
