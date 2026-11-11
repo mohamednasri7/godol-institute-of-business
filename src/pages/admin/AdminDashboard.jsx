@@ -11,6 +11,7 @@ import {
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
 import { supabase, isSupabaseClientConfigured } from '../../lib/supabase';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import DashboardCharts from '../../components/admin/DashboardCharts';
 import NeedsAttentionPanel from '../../components/admin/NeedsAttentionPanel';
 import RecentActivityFeed from '../../components/admin/RecentActivityFeed';

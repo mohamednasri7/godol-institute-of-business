@@ -778,8 +778,8 @@ export default function InstructorDashboard() {
 
                         <div className="pt-4 border-t border-gray-100 space-y-3">
                           <div className="flex items-center justify-between text-xs text-gray-600 font-medium">
-                            <span>👥 {course.studentsCount || 0} Enrolled Students</span>
-                            <span>⏱ {course.durationHours || 4}h course</span>
+                            <span>👥 {course.enrolledCount ?? course.studentsCount ?? 0} {(course.enrolledCount ?? course.studentsCount ?? 0) === 1 ? 'Enrolled Student' : 'Enrolled Students'}</span>
+                            <span>⏱ {Number(course.durationHours) > 0 ? `${course.durationHours}h course` : 'Self-paced'}</span>
                           </div>
                           <div className="flex gap-2">
                             <Link

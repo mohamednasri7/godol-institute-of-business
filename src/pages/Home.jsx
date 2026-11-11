@@ -20,6 +20,7 @@ import {
 import CourseCard from '../components/CourseCard';
 import InstructorCard from '../components/InstructorCard';
 import { apiFetch } from '../lib/api';
+import { useRealtimeSync } from '../hooks/useRealtimeSync';
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -31,7 +32,7 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('');
 
-  useEffect(() => {
+  const loadHomeData = () => {
     apiFetch('/api/stats').then(setStats).catch(() => { });
     apiFetch('/api/courses/featured').then(res => {
       if (Array.isArray(res)) setFeaturedCourses(res);
@@ -44,7 +45,14 @@ export default function Home() {
       if (Array.isArray(res)) setWorkshops(res);
     }).catch(() => { });
     apiFetch('/api/settings').then(res => setSettings(res.map || {})).catch(() => { });
+  };
+
+  useEffect(() => {
+    loadHomeData();
   }, []);
+
+  // Instant Realtime sync: automatically refreshes stats, featured courses, and faculty
+  useRealtimeSync(['courses', 'instructors', 'workshops'], loadHomeData);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();

@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { Search, Filter, X, SlidersHorizontal, BookOpen } from 'lucide-react';
 import CourseCard from '../components/CourseCard';
 import { apiFetch } from '../lib/api';
+import { useRealtimeSync } from '../hooks/useRealtimeSync';
 
 export default function Courses() {
   const [, setLocation] = useLocation();
@@ -31,8 +32,9 @@ export default function Courses() {
     window.history.replaceState(null, '', `/courses${queryString ? '?' + queryString : ''}`);
   }, [searchQuery, selectedCategory, selectedLevel, sortBy]);
 
-  useEffect(() => {
-    setIsLoading(true);
+  const loadCoursesAndCategories = (source) => {
+    // Only show full loading spinner on initial mount, not on silent realtime background updates
+    if (!source) setIsLoading(true);
     Promise.allSettled([apiFetch('/api/courses'), apiFetch('/api/categories')])
       .then(([coursesRes, categoriesRes]) => {
         if (coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value)) {
@@ -46,7 +48,14 @@ export default function Courses() {
       })
       .catch((err) => console.error('Failed to load courses or categories:', err))
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    loadCoursesAndCategories();
   }, []);
+
+  // Instant Realtime sync: updates in 0-100ms on Supabase mutations, tab switches, and inter-tab events
+  useRealtimeSync(['courses', 'categories'], loadCoursesAndCategories);
 
   const safeCourses = Array.isArray(courses) ? courses : [];
 

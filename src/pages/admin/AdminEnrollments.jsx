@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 
 const ENROLLMENT_STATUS = {
   pending_payment: { label: 'Pending Payment', color: 'bg-gray-100 text-gray-600' },
@@ -53,6 +54,9 @@ export default function AdminEnrollments() {
   };
 
   useEffect(() => { fetchEnrollments(); }, [statusFilter]);
+
+  // Instant Realtime sync: new student enrollments appear live
+  useRealtimeSync(['enrollments', 'payments'], fetchEnrollments);
 
   const handleApprove = async (enrollment) => {
     if (!confirm(`Approve enrollment for ${enrollment.studentName} in "${enrollment.courseTitle}"?`)) return;

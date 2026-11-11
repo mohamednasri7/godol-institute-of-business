@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { auth } from '../lib/auth';
 import { apiFetch } from '../lib/api';
+import { useRealtimeSync } from '../hooks/useRealtimeSync';
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
@@ -33,15 +34,11 @@ export default function Dashboard() {
   // View certificate modal
   const [activeCert, setActiveCert] = useState(null);
 
-  useEffect(() => {
+  const loadDashboardData = (source) => {
     const user = auth.getUser();
-    if (!user) {
-      setLocation('/login');
-      return;
-    }
-    setCurrentUser(user);
+    if (!user) return;
+    if (!source) setIsLoading(true);
 
-    setIsLoading(true);
     Promise.all([
       apiFetch(`/api/enrollments?email=${encodeURIComponent(user.email)}`),
       apiFetch(`/api/certificates?email=${encodeURIComponent(user.email)}`),
@@ -58,7 +55,20 @@ export default function Dashboard() {
       })
       .catch((err) => console.error(err))
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    const user = auth.getUser();
+    if (!user) {
+      setLocation('/login');
+      return;
+    }
+    setCurrentUser(user);
+    loadDashboardData();
   }, [setLocation]);
+
+  // Instant Realtime sync: updates student dashboard immediately when admin approves payment or issues certificate
+  useRealtimeSync(['enrollments', 'payments', 'certificates'], loadDashboardData);
 
   const handleSignOut = () => {
     auth.logout();

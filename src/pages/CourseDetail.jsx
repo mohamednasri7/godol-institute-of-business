@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { auth } from '../lib/auth';
+import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import BunnyVideoPlayer from '../components/course/BunnyVideoPlayer';
 
 export default function CourseDetail() {
@@ -69,8 +70,7 @@ export default function CourseDetail() {
       .finally(() => setIsLoading(false));
   }, [id]);
 
-  // Check enrollment/access status
-  useEffect(() => {
+  const checkAccessStatus = () => {
     const user = auth.getUser();
     if (user && course) {
       apiFetch(`/api/enrollments/access?courseId=${course.id}&email=${encodeURIComponent(user.email)}`)
@@ -98,7 +98,22 @@ export default function CourseDetail() {
         })
         .catch(() => {});
     }
+  };
+
+  // Check enrollment/access status
+  useEffect(() => {
+    checkAccessStatus();
   }, [course]);
+
+  // Realtime synchronization for course info, payment verification, and enrollment approval
+  useRealtimeSync(['courses', 'enrollments', 'payments'], () => {
+    checkAccessStatus();
+    if (id) {
+      apiFetch(`/api/courses/${id}`)
+        .then(setCourse)
+        .catch(() => {});
+    }
+  });
 
   const handleEnrollClick = async () => {
     const user = auth.getUser();
@@ -180,6 +195,24 @@ export default function CourseDetail() {
   }
 
   const allLessons = modules.flatMap((m) => m.lessons || []);
+  const realLessonCount = allLessons.length > 0
+    ? allLessons.length
+    : (Number(course?.lessonCount) || 0);
+
+  const realModuleCount = modules.length > 0
+    ? modules.length
+    : (Number(course?.moduleCount) || (Array.isArray(course?.sections) ? course.sections.length : 0));
+
+  const totalLessonDurationSeconds = allLessons.reduce(
+    (sum, l) => sum + (Number(l.durationSeconds || l.duration_seconds) || 0),
+    0
+  );
+
+  const realDurationHours = totalLessonDurationSeconds > 0
+    ? Math.round((totalLessonDurationSeconds / 3600) * 10) / 10
+    : (Number(course?.durationHours) || 0);
+
+  const realEnrolledCount = Number(course?.enrolledCount) || 0;
   const isApproved = accessStatus === 'approved';
 
   const getActionButton = () => {
@@ -306,18 +339,20 @@ export default function CourseDetail() {
                 <span className="font-bold">
                   {course.rating ? Number(course.rating).toFixed(1) : '5.0'}
                 </span>
-                <span className="text-white/50">({course.enrolledCount ?? 0} enrolled)</span>
+                <span className="text-white/50">({realEnrolledCount} {realEnrolledCount === 1 ? 'enrolled' : 'enrolled'})</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-white/60" />
                 <span>
-                  {course.durationHours ? `${course.durationHours} hours` : 'Flexible Pace'}
+                  {realDurationHours > 0
+                    ? `${realDurationHours} ${realDurationHours === 1 ? 'hour' : 'hours'}`
+                    : (realLessonCount > 0 ? 'Self-paced' : 'Flexible Pace')}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <BookOpen className="w-4 h-4 text-white/60" />
                 <span>
-                  {allLessons.length > 0 ? `${allLessons.length} lessons` : (course.lessonCount ? `${course.lessonCount} lessons` : 'Curriculum')}
+                  {realLessonCount} {realLessonCount === 1 ? 'lesson' : 'lessons'}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -367,7 +402,7 @@ export default function CourseDetail() {
                     Curriculum Syllabus
                   </h2>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {modules.length} modules • {allLessons.length} comprehensive lessons
+                    {realModuleCount} {realModuleCount === 1 ? 'module' : 'modules'} • {realLessonCount} {realLessonCount === 1 ? 'comprehensive lesson' : 'comprehensive lessons'}
                   </p>
                 </div>
                 {allLessons.some((l) => l.isFreePreview) && (
@@ -395,7 +430,7 @@ export default function CourseDetail() {
                           <div>
                             <h4 className="font-bold text-sm text-foreground">{mod.title}</h4>
                             <span className="text-xs text-muted-foreground">
-                              {modLessons.length} lessons
+                              {modLessons.length} {modLessons.length === 1 ? 'lesson' : 'lessons'}
                             </span>
                           </div>
                           {isOpen ? (
@@ -552,16 +587,16 @@ export default function CourseDetail() {
                 <div className="flex items-center gap-2.5">
                   <Clock className="w-4 h-4 text-primary" />
                   <span>
-                    {course.durationHours
-                      ? `${course.durationHours} hours on-demand training`
+                    {realDurationHours > 0
+                      ? `${realDurationHours} ${realDurationHours === 1 ? 'hour' : 'hours'} on-demand training`
                       : 'Comprehensive modular curriculum'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2.5">
                   <BookOpen className="w-4 h-4 text-primary" />
                   <span>
-                    {allLessons.length > 0
-                      ? `${allLessons.length} practical lessons`
+                    {realLessonCount > 0
+                      ? `${realLessonCount} ${realLessonCount === 1 ? 'practical lesson' : 'practical lessons'}`
                       : 'Structured video modules'}
                   </span>
                 </div>
@@ -635,7 +670,7 @@ export default function CourseDetail() {
             </div>
             <div className="p-6 bg-slate-950 text-white flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/10">
               <p className="text-xs text-white/70">
-                Enjoyed this preview? Enroll now to unlock all {allLessons.length} lessons, downloadable templates, and accredited certification.
+                Enjoyed this preview? Enroll now to unlock all {realLessonCount} {realLessonCount === 1 ? 'lesson' : 'lessons'}, downloadable templates, and accredited certification.
               </p>
               <button
                 onClick={() => {

@@ -8,6 +8,7 @@ import {
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
 import { exportToCSV } from '../../lib/exportUtils';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 
 const STATUS_CONFIG = {
   pending_verification: { label: 'Pending Verification', color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -75,6 +76,9 @@ export default function AdminPayments() {
   };
 
   useEffect(() => { fetchPayments(); }, [statusFilter]);
+
+  // Instant Realtime sync: new payments and verification status appear immediately in real time
+  useRealtimeSync(['payments', 'enrollments'], fetchPayments);
 
   const copyText = (text, label) => {
     navigator.clipboard.writeText(text).then(() => {

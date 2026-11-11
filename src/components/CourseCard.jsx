@@ -81,11 +81,11 @@ export default function CourseCard({ course }) {
             <span className="font-bold text-foreground">
               {course.rating ? Number(course.rating).toFixed(1) : '5.0'}
             </span>
-            <span>({course.enrolledCount ?? 0})</span>
+            <span>({Number(course.enrolledCount) || 0})</span>
           </div>
 
           <div className="flex items-center gap-3">
-            {course.durationHours ? (
+            {Number(course.durationHours) > 0 ? (
               <span className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
                 {course.durationHours}h
@@ -93,7 +93,11 @@ export default function CourseCard({ course }) {
             ) : null}
             <span className="flex items-center gap-1">
               <BookOpen className="w-3.5 h-3.5" />
-              {course.lessonCount ? `${course.lessonCount} lessons` : (course.sections?.length ? `${course.sections.length} modules` : 'Curriculum')}
+              {Number(course.lessonCount) > 0
+                ? `${course.lessonCount} ${Number(course.lessonCount) === 1 ? 'lesson' : 'lessons'}`
+                : (Number(course.moduleCount) > 0
+                    ? `${course.moduleCount} ${Number(course.moduleCount) === 1 ? 'module' : 'modules'}`
+                    : '0 lessons')}
             </span>
           </div>
         </div>

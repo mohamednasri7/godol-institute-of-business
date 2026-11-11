@@ -526,7 +526,7 @@ export async function pullFromSupabase() {
 export async function ensureFreshData(force = false) {
   if (!isSupabaseConfigured || !supabase) return loadDB();
   const now = Date.now();
-  if (force || (now - lastSyncTime > 2500 && !isSyncingNow)) {
+  if (force || (now - lastSyncTime > 800 && !isSyncingNow)) {
     isSyncingNow = true;
     try {
       await pullFromSupabase();
@@ -648,18 +648,29 @@ function getSettingValue(db, key) {
 
 export function createApiRouter() {
   const router = express.Router();
+
+  // Disable caching on all API routes so data is always fresh
+  router.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    next();
+  });
+
   router.use(express.json({ limit: '25mb' }));
 
   // Bunny.net Stream & Storage CDN Router
   router.use('/bunny', createBunnyRouter());
 
-  // Auto-sync middleware: for any GET request, if it's been > 2.5s since last sync,
-  // pull latest changes from Supabase so the dashboard and website always show the newest data
+  // Auto-sync middleware: for any GET request, if it's been > 800ms since last sync or requested with fresh/timestamp,
+  // pull latest changes from Supabase so the dashboard and website always show the newest data immediately
   router.use(async (req, res, next) => {
     if (isSupabaseConfigured && req.method === 'GET') {
+      const isExplicitFresh = req.query.fresh === 'true' || Boolean(req.query._t);
       const now = Date.now();
-      if (now - lastSyncTime > 2500 && !isSyncingNow) {
-        await ensureFreshData();
+      if (isExplicitFresh || (now - lastSyncTime > 800 && !isSyncingNow)) {
+        await ensureFreshData(Boolean(isExplicitFresh));
       }
     }
     next();
@@ -738,6 +749,74 @@ export function createApiRouter() {
     res.json({ list: db.settings || [], map });
   });
 
+// Dynamic Course Stats Calculation (Modules, Lessons, Duration, and Enrollments)
+export function enrichCourseWithDynamicStats(course, db) {
+  if (!course) return course;
+  const courseId = Number(course.id);
+
+  // 1. Get modules
+  const modules = (db.course_modules || []).filter(
+    m => Number(m.courseId || m.course_id) === courseId
+  );
+  const moduleCount = modules.length > 0 
+    ? modules.length 
+    : (Array.isArray(course.sections) ? course.sections.length : 0);
+
+  // 2. Get lessons (from course_lessons or modules or legacy sections)
+  let lessons = (db.course_lessons || []).filter(
+    l => Number(l.courseId || l.course_id) === courseId
+  );
+  if (lessons.length === 0 && Array.isArray(course.sections)) {
+    lessons = course.sections.flatMap(s => s.lessons || []);
+  }
+  const lessonCount = lessons.length;
+
+  // 3. Calculate total duration from lessons if available
+  const totalDurationSeconds = lessons.reduce(
+    (sum, l) => sum + (Number(l.durationSeconds || l.duration_seconds) || 0), 
+    0
+  );
+
+  let durationHours = 0;
+  if (totalDurationSeconds > 0) {
+    durationHours = Math.round((totalDurationSeconds / 3600) * 10) / 10;
+  } else if (lessonCount > 0 && course.durationHours) {
+    durationHours = Number(course.durationHours);
+  } else {
+    durationHours = 0;
+  }
+
+  // 4. Calculate real enrolled count from enrollments table
+  const enrolledCount = (db.enrollments || []).filter(
+    e => (Number(e.courseId || e.course_id) === courseId) &&
+         (e.accessGranted === true || e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed')
+  ).length;
+
+  return {
+    ...course,
+    moduleCount,
+    lessonCount,
+    durationHours,
+    durationSeconds: totalDurationSeconds,
+    enrolledCount: enrolledCount > 0 ? enrolledCount : (Number(course.enrolledCount) || 0)
+  };
+}
+
+export function recalculateAndSyncCourse(courseId, db) {
+  if (!courseId) return;
+  const course = db.courses.find(c => c.id === Number(courseId));
+  if (!course) return;
+  const enriched = enrichCourseWithDynamicStats(course, db);
+  course.lessonCount = enriched.lessonCount;
+  course.moduleCount = enriched.moduleCount;
+  course.durationHours = enriched.durationHours;
+  course.enrolledCount = enriched.enrolledCount;
+  saveDB(db);
+  if (isSupabaseConfigured && supabase) {
+    syncRecordToSupabase('courses', course).catch(() => {});
+  }
+}
+
   // Courses
   router.get('/courses', async (req, res) => {
     if (isSupabaseConfigured) await ensureFreshData();
@@ -747,7 +826,8 @@ export function createApiRouter() {
       const isPublished = c.status === 'published' || c.is_published === true || c.status === 'active' || (!c.status && c.approvalStatus === 'approved');
       const notRejected = c.approvalStatus !== 'rejected';
       return isPublished && notRejected;
-    });
+    }).map(c => enrichCourseWithDynamicStats(c, db));
+
     const { search, q, category, level, featured } = req.query;
     const query = (search || q || '').toLowerCase();
     if (query) {
@@ -773,7 +853,9 @@ export function createApiRouter() {
   router.get('/courses/featured', async (req, res) => {
     if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
-    const published = db.courses.filter(c => (c.status === 'published' || c.is_published === true || !c.status) && c.approvalStatus !== 'rejected');
+    const published = db.courses
+      .filter(c => (c.status === 'published' || c.is_published === true || !c.status) && c.approvalStatus !== 'rejected')
+      .map(c => enrichCourseWithDynamicStats(c, db));
     const featured = published.filter(c => c.featured);
     const result = featured.length > 0 ? featured : published.slice(0, 4);
     res.json(result);
@@ -784,7 +866,7 @@ export function createApiRouter() {
     const db = loadDB();
     const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
     if (!course) return res.status(404).json({ error: 'Course not found' });
-    res.json(course);
+    res.json(enrichCourseWithDynamicStats(course, db));
   });
 
   router.get('/courses/:id/progress', (req, res) => {
@@ -818,7 +900,7 @@ export function createApiRouter() {
       });
 
     res.json({
-      course,
+      course: enrichCourseWithDynamicStats(course, db),
       modules
     });
   });
@@ -865,6 +947,7 @@ export function createApiRouter() {
     if (isSupabaseConfigured && supabase) {
       await syncRecordToSupabase('course_modules', newModule);
     }
+    recalculateAndSyncCourse(course.id, db);
 
     res.status(201).json(newModule);
   });
@@ -903,6 +986,7 @@ export function createApiRouter() {
         await supabase.from('course_modules').delete().eq('id', modId);
       } catch { }
     }
+    recalculateAndSyncCourse(Number(req.params.id), db);
 
     res.json({ success: true, deletedModuleId: modId });
   });
@@ -946,6 +1030,7 @@ export function createApiRouter() {
     if (isSupabaseConfigured && supabase) {
       await syncRecordToSupabase('course_lessons', newLesson);
     }
+    recalculateAndSyncCourse(course.id, db);
 
     res.status(201).json(newLesson);
   });
@@ -967,6 +1052,7 @@ export function createApiRouter() {
     if (isSupabaseConfigured && supabase) {
       await syncRecordToSupabase('course_lessons', updated);
     }
+    recalculateAndSyncCourse(updated.courseId || updated.course_id, db);
 
     res.json(updated);
   });
@@ -975,6 +1061,9 @@ export function createApiRouter() {
   router.delete('/lessons/:lessonId', async (req, res) => {
     const db = loadDB();
     const lessonId = Number(req.params.lessonId);
+    const target = db.course_lessons.find(l => l.id === lessonId);
+    const courseId = target?.courseId || target?.course_id;
+
     db.course_lessons = db.course_lessons.filter(l => l.id !== lessonId);
     saveDB(db);
 
@@ -983,6 +1072,7 @@ export function createApiRouter() {
         await supabase.from('course_lessons').delete().eq('id', lessonId);
       } catch { }
     }
+    if (courseId) recalculateAndSyncCourse(courseId, db);
 
     res.json({ success: true, deletedLessonId: lessonId });
   });
@@ -1704,20 +1794,20 @@ export function createApiRouter() {
       adminNotes
     } = req.body;
 
-    if (!enrollmentId) {
-      return res.status(400).json({ error: 'enrollmentId is required' });
+    if (!enrollmentId && !studentEmail) {
+      return res.status(400).json({ error: 'enrollmentId or studentEmail is required' });
     }
 
     const id = Number(enrollmentId);
-    let enrollment = db.enrollments.find(e => e.id === id);
+    let enrollment = !isNaN(id) && id > 0 ? db.enrollments.find(e => e.id === id) : null;
 
     // If not found in memory, query Supabase directly
-    if (!enrollment && supabase) {
+    if (!enrollment && supabase && !isNaN(id) && id > 0) {
       try {
         const { data: supaEnr, error: supaErr } = await supabase.from('enrollments').select('*').eq('id', id).maybeSingle();
         if (supaEnr && !supaErr) {
           enrollment = rowToCamel(supaEnr);
-          db.enrollments.push(enrollment);
+          if (!db.enrollments.some(e => e.id === enrollment.id)) db.enrollments.push(enrollment);
         }
       } catch (err) {
         console.warn('Could not query Supabase for enrollment:', err.message);
@@ -1726,9 +1816,48 @@ export function createApiRouter() {
 
     // Secondary fallback: lookup by student email if id was not found
     if (!enrollment && studentEmail) {
+      const cleanEmail = studentEmail.trim().toLowerCase();
       enrollment = db.enrollments.find(
-        e => e.studentEmail?.toLowerCase() === studentEmail.trim().toLowerCase()
+        e => e.studentEmail?.toLowerCase() === cleanEmail
       );
+      if (!enrollment && supabase) {
+        try {
+          const { data: supaByEmail } = await supabase.from('enrollments').select('*').eq('student_email', cleanEmail).order('id', { ascending: false }).limit(1).maybeSingle();
+          if (supaByEmail) {
+            enrollment = rowToCamel(supaByEmail);
+            if (!db.enrollments.some(e => e.id === enrollment.id)) db.enrollments.push(enrollment);
+          }
+        } catch (err) {
+          console.warn('Could not query Supabase for enrollment by email:', err.message);
+        }
+      }
+    }
+
+    // Tertiary fallback: auto-create the enrollment on the fly to prevent any payment failure
+    if (!enrollment && (studentEmail || req.body.courseId)) {
+      const course = db.courses.find(c => c.id === Number(req.body.courseId)) || db.courses[0];
+      const newId = Math.max(0, ...db.enrollments.map(e => e.id || 0)) + 1;
+      enrollment = {
+        id: newId,
+        studentName: req.body.studentName || studentEmail?.split('@')[0] || 'Student',
+        studentEmail: (studentEmail || 'student@godol.org').toLowerCase().trim(),
+        studentPhone: senderPhone || '',
+        courseId: course?.id || 1,
+        courseTitle: course?.title || 'Godol Masterclass',
+        coursePrice: course?.price || Number(claimedAmount) || 20,
+        paymentId: null,
+        paymentStatus: 'pending_verification',
+        enrollmentStatus: 'pending_verification',
+        accessGranted: false,
+        accessGrantedAt: null,
+        progress: 0,
+        enrolledAt: new Date().toISOString(),
+        approvedAt: null,
+        approvedBy: null
+      };
+      db.enrollments.push(enrollment);
+      saveDB(db);
+      await syncRecordToSupabase('enrollments', enrollment);
     }
 
     if (!enrollment) {
@@ -1822,9 +1951,9 @@ export function createApiRouter() {
     await ensureFreshData();
     const db = loadDB();
     const id = Number(req.params.id);
-    let enrollment = db.enrollments.find(e => e.id === id);
+    let enrollment = !isNaN(id) && id > 0 ? db.enrollments.find(e => e.id === id) : null;
 
-    if (!enrollment && supabase) {
+    if (!enrollment && supabase && !isNaN(id) && id > 0) {
       try {
         const { data } = await supabase.from('enrollments').select('*').eq('id', id).maybeSingle();
         if (data) {
@@ -1833,6 +1962,21 @@ export function createApiRouter() {
         }
       } catch (err) {
         console.warn('Supabase fetch error:', err.message);
+      }
+    }
+
+    // Fallback: search by email query param if provided
+    if (!enrollment && req.query.email) {
+      const email = String(req.query.email).trim().toLowerCase();
+      enrollment = db.enrollments.find(e => e.studentEmail?.toLowerCase() === email);
+      if (!enrollment && supabase) {
+        try {
+          const { data } = await supabase.from('enrollments').select('*').eq('student_email', email).order('id', { ascending: false }).limit(1).maybeSingle();
+          if (data) {
+            enrollment = rowToCamel(data);
+            if (!db.enrollments.some(e => e.id === enrollment.id)) db.enrollments.push(enrollment);
+          }
+        } catch (err) {}
       }
     }
 
@@ -2200,7 +2344,7 @@ export function createApiRouter() {
   router.get('/admin/courses', async (req, res) => {
     if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
-    res.json(db.courses);
+    res.json((db.courses || []).map(c => enrichCourseWithDynamicStats(c, db)));
   });
 
   router.post('/admin/courses', async (req, res) => {
@@ -2220,7 +2364,7 @@ export function createApiRouter() {
       description: req.body.description || '',
       price: Number(req.body.price || 0),
       level: req.body.level || 'Beginner',
-      durationHours: Number(req.body.durationHours || 10),
+      durationHours: Number(req.body.durationHours || 0),
       lessonCount: Number(req.body.lessonCount || 0),
       enrolledCount: Number(req.body.enrolledCount || 0),
       rating: Number(req.body.rating || 5.0),

@@ -7,6 +7,7 @@ import {
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
 import { exportToCSV } from '../../lib/exportUtils';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 
 const STATUS_COLOR = {
   published: 'bg-emerald-100 text-emerald-700',
@@ -57,6 +58,13 @@ export default function AdminCourses() {
     fetchInstructors();
     fetchCategories();
   }, []);
+
+  // Instant Realtime sync: updates course list across tabs and devices in 0-100ms
+  useRealtimeSync(['courses', 'categories', 'instructors'], () => {
+    fetchCourses();
+    fetchInstructors();
+    fetchCategories();
+  });
 
   const handleThumbnailUpload = (e) => {
     const file = e.target.files?.[0];
@@ -244,7 +252,7 @@ export default function AdminCourses() {
                         <img src={c.thumbnail || '/course-business.png'} alt={c.title} className="w-10 h-7 object-cover rounded-lg flex-shrink-0" />
                         <div>
                           <div className="font-semibold text-gray-900 max-w-[180px] truncate">{c.title}</div>
-                          <div className="text-[10px] text-gray-400">{c.categoryName}</div>
+                          <div className="text-[10px] text-gray-400">{c.categoryName} • {c.lessonCount ?? 0} {(c.lessonCount ?? 0) === 1 ? 'lesson' : 'lessons'}</div>
                           {c.featured && <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded mt-0.5 inline-block">Featured</span>}
                         </div>
                       </div>
@@ -252,7 +260,7 @@ export default function AdminCourses() {
                     <td className="py-4 px-5 text-gray-600">{c.instructorName || '—'}</td>
                     <td className="py-4 px-5 font-bold text-gray-900">{c.price === 0 ? 'Free' : `$${c.price}`}</td>
                     <td className="py-4 px-5">
-                      <div className="flex items-center gap-1"><Users className="w-3.5 h-3.5 text-gray-400" />{c.enrolledCount || 0}</div>
+                      <div className="flex items-center gap-1"><Users className="w-3.5 h-3.5 text-gray-400" />{c.enrolledCount || 0} {(c.enrolledCount || 0) === 1 ? 'student' : 'students'}</div>
                     </td>
                     <td className="py-4 px-5">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLOR[c.status] || 'bg-gray-100 text-gray-500'}`}>{c.status}</span>

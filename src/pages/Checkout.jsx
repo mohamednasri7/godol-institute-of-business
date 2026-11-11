@@ -47,10 +47,10 @@ export default function Checkout() {
 
     // Fetch enrollment and providers in parallel
     Promise.all([
-      apiFetch(`/api/enrollments/${enrollmentId}`).catch(async () => {
+      apiFetch(`/api/enrollments/${enrollmentId}?email=${encodeURIComponent(user.email)}`).catch(async () => {
         // Fallback: search by user email
         const list = await apiFetch(`/api/enrollments?email=${encodeURIComponent(user.email)}`);
-        const found = list.find(e => e.id === Number(enrollmentId));
+        const found = list.find(e => e.id === Number(enrollmentId)) || list.find(e => e.courseId === Number(enrollmentId)) || list[0];
         if (found) return { enrollment: found, payment: null };
         throw new Error('Enrollment not found');
       }),
@@ -195,6 +195,8 @@ export default function Checkout() {
         method: 'POST',
         body: JSON.stringify({
           enrollmentId: enrollment.id,
+          courseId: enrollment.courseId,
+          studentName: user?.name || enrollment.studentName,
           studentEmail: user?.email || enrollment.studentEmail,
           provider,
           senderPhone: senderPhone.trim(),
@@ -510,8 +512,16 @@ export default function Checkout() {
             <p className="text-white/60 text-[11px] mb-0.5">Enrolling in</p>
             <h1 className="font-bold text-sm sm:text-base leading-snug truncate">{enrollment.courseTitle}</h1>
             <div className="flex items-center gap-3 mt-1.5 text-[11px] text-white/60">
-              {course?.durationHours && <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-amber-400" />{course.durationHours}h</span>}
-              {course?.lessonCount && <span className="flex items-center gap-1"><BookOpen className="w-3 h-3 text-amber-400" />{course.lessonCount} lessons</span>}
+              {Number(course?.durationHours) > 0 ? (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-amber-400" />
+                  {course.durationHours}h
+                </span>
+              ) : null}
+              <span className="flex items-center gap-1">
+                <BookOpen className="w-3 h-3 text-amber-400" />
+                {Number(course?.lessonCount) || 0} {Number(course?.lessonCount) === 1 ? 'lesson' : 'lessons'}
+              </span>
             </div>
           </div>
           <div className="text-right flex-shrink-0 pl-2">

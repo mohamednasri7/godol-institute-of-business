@@ -9,6 +9,7 @@ import {
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
 import { auth } from '../../lib/auth';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 
 const defaultInst = {
   name: '',
@@ -115,6 +116,9 @@ export default function AdminInstructors() {
   useEffect(() => {
     loadAll();
   }, []);
+
+  // Instant Realtime sync: updates instructor roster live
+  useRealtimeSync(['instructors', 'categories'], loadAll);
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, X, CheckCircle, Send, Users, ShieldCheck, ArrowRight } from 'lucide-react';
 import InstructorCard from '../components/InstructorCard';
 import { apiFetch } from '../lib/api';
+import { useRealtimeSync } from '../hooks/useRealtimeSync';
 
 export default function Instructors() {
   const [instructors, setInstructors] = useState([]);
@@ -20,12 +21,20 @@ export default function Instructors() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  useEffect(() => {
+  const loadInstructors = (source) => {
+    if (!source) setIsLoading(true);
     apiFetch('/api/instructors')
       .then(setInstructors)
       .catch((err) => console.error(err))
       .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    loadInstructors();
   }, []);
+
+  // Instant Realtime sync: updates public faculty roster automatically
+  useRealtimeSync(['instructors'], loadInstructors);
 
   const handleApplySubmit = async (e) => {
     e.preventDefault();
