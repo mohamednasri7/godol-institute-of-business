@@ -200,7 +200,7 @@ function loadDB() {
 // Whitelist of valid PostgreSQL columns per table to avoid PostgREST schema cache errors
 const TABLE_COLUMNS = {
   instructors: ['id', 'name', 'title', 'bio', 'avatar', 'email', 'phone', 'rating', 'review_count', 'student_count', 'course_count', 'status', 'joined_at'],
-  courses: ['id', 'title', 'slug', 'description', 'price', 'level', 'duration_hours', 'lesson_count', 'enrolled_count', 'rating', 'featured', 'badge', 'thumbnail', 'thumbnail_url', 'promo_video_id', 'is_published', 'category', 'instructor_id', 'instructor_name', 'category_id', 'category_name', 'status', 'approval_status', 'what_you_learn', 'requirements', 'sections', 'created_at'],
+  courses: ['id', 'title', 'slug', 'description', 'price', 'level', 'duration_hours', 'lesson_count', 'enrolled_count', 'rating', 'featured', 'badge', 'thumbnail', 'instructor_id', 'instructor_name', 'category_id', 'category_name', 'status', 'approval_status', 'what_you_learn', 'requirements', 'sections', 'created_at'],
   course_modules: ['id', 'course_id', 'title', 'sort_order', 'created_at'],
   course_lessons: ['id', 'module_id', 'course_id', 'title', 'description', 'bunny_video_id', 'bunny_library_id', 'duration_seconds', 'resource_urls', 'is_free_preview', 'sort_order', 'created_at'],
   course_enrollments: ['id', 'user_id', 'course_id', 'enrolled_at', 'completed_at', 'last_accessed_lesson_id', 'created_at'],
@@ -233,6 +233,21 @@ function snakeToCamel(str) {
 function rowToSnake(obj, tableName) {
   const allowed = tableName && TABLE_COLUMNS[tableName];
   const out = {};
+
+  // Clean and normalize courses payload for Supabase PostgreSQL schema
+  if (tableName === 'courses') {
+    const clone = { ...obj };
+    if (clone.thumbnailUrl && !clone.thumbnail) clone.thumbnail = clone.thumbnailUrl;
+    if (clone.category && !clone.categoryName) clone.categoryName = clone.category;
+    if (clone.isPublished && !clone.status) clone.status = 'published';
+    if (!clone.status) clone.status = 'published';
+    if (!clone.approvalStatus) clone.approvalStatus = clone.status === 'published' ? 'approved' : 'pending';
+    if (!Array.isArray(clone.whatYouLearn)) clone.whatYouLearn = [];
+    if (!Array.isArray(clone.requirements)) clone.requirements = [];
+    if (!Array.isArray(clone.sections)) clone.sections = [];
+    obj = clone;
+  }
+
   for (const [k, v] of Object.entries(obj)) {
     const snakeKey = toSnakeCase(k);
     if (!allowed || allowed.includes(snakeKey)) {
@@ -724,15 +739,21 @@ export function createApiRouter() {
   });
 
   // Courses
-  router.get('/courses', (req, res) => {
+  router.get('/courses', async (req, res) => {
+    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
-    let result = db.courses.filter(c => c.status === 'published' && c.approvalStatus === 'approved');
+    // Live on website if published or approved, and not rejected
+    let result = db.courses.filter(c => {
+      const isPublished = c.status === 'published' || c.is_published === true || c.status === 'active' || (!c.status && c.approvalStatus === 'approved');
+      const notRejected = c.approvalStatus !== 'rejected';
+      return isPublished && notRejected;
+    });
     const { search, q, category, level, featured } = req.query;
     const query = (search || q || '').toLowerCase();
     if (query) {
       result = result.filter(c =>
-        c.title.toLowerCase().includes(query) ||
-        c.description.toLowerCase().includes(query) ||
+        (c.title || '').toLowerCase().includes(query) ||
+        (c.description || '').toLowerCase().includes(query) ||
         (c.categoryName && c.categoryName.toLowerCase().includes(query)) ||
         (c.instructorName && c.instructorName.toLowerCase().includes(query))
       );
@@ -749,13 +770,17 @@ export function createApiRouter() {
     res.json(result);
   });
 
-  router.get('/courses/featured', (req, res) => {
+  router.get('/courses/featured', async (req, res) => {
+    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
-    const result = db.courses.filter(c => c.featured && c.status === 'published');
-    res.json(result.length > 0 ? result : db.courses.slice(0, 4));
+    const published = db.courses.filter(c => (c.status === 'published' || c.is_published === true || !c.status) && c.approvalStatus !== 'rejected');
+    const featured = published.filter(c => c.featured);
+    const result = featured.length > 0 ? featured : published.slice(0, 4);
+    res.json(result);
   });
 
-  router.get('/courses/:id', (req, res) => {
+  router.get('/courses/:id', async (req, res) => {
+    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
     const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
     if (!course) return res.status(404).json({ error: 'Course not found' });
@@ -2102,38 +2127,75 @@ export function createApiRouter() {
 
   // ─────────── ADMIN COURSES ───────────
 
-  router.get('/admin/courses', (req, res) => {
+  router.get('/admin/courses', async (req, res) => {
+    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
     res.json(db.courses);
   });
 
   router.post('/admin/courses', async (req, res) => {
+    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
-    const isPub = req.body.status === 'published';
+    const status = req.body.status || 'published';
+    const isPub = status === 'published';
+    const cleanTitle = (req.body.title || 'Untitled Course').trim();
+    const baseSlug = cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const courseId = nextId(db.courses);
+    const slug = req.body.slug || (baseSlug ? `${baseSlug}-${courseId}` : `course-${courseId}`);
+
     const newCourse = {
-      ...req.body,
-      id: nextId(db.courses),
-      status: req.body.status || 'draft',
+      id: courseId,
+      title: cleanTitle,
+      slug,
+      description: req.body.description || '',
+      price: Number(req.body.price || 0),
+      level: req.body.level || 'Beginner',
+      durationHours: Number(req.body.durationHours || 10),
+      lessonCount: Number(req.body.lessonCount || 0),
+      enrolledCount: Number(req.body.enrolledCount || 0),
+      rating: Number(req.body.rating || 5.0),
+      featured: Boolean(req.body.featured),
+      badge: req.body.badge || (req.body.featured ? 'Featured' : null),
+      thumbnail: req.body.thumbnail || '/course-business.png',
+      instructorId: req.body.instructorId ? Number(req.body.instructorId) : null,
+      instructorName: req.body.instructorName || 'Godol Faculty',
+      categoryId: req.body.categoryId ? Number(req.body.categoryId) : null,
+      categoryName: req.body.categoryName || req.body.category || 'Business Strategy',
+      status,
       approvalStatus: isPub ? 'approved' : (req.body.approvalStatus || 'pending'),
+      whatYouLearn: Array.isArray(req.body.whatYouLearn) ? req.body.whatYouLearn : [],
+      requirements: Array.isArray(req.body.requirements) ? req.body.requirements : [],
+      sections: Array.isArray(req.body.sections) ? req.body.sections : [],
       createdAt: new Date().toISOString()
     };
+
     db.courses.unshift(newCourse);
     db.stats.totalCourses = db.courses.length;
     saveDB(db);
+
+    // Live upsert to Supabase
     await syncRecordToSupabase('courses', newCourse);
     res.status(201).json(newCourse);
   });
 
   router.put('/admin/courses/:id', async (req, res) => {
+    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
     const id = Number(req.params.id);
     const idx = db.courses.findIndex(c => c.id === id);
     if (idx === -1) return res.status(404).json({ error: 'Course not found' });
     const prev = db.courses[idx];
-    const updated = { ...prev, ...req.body };
-    if (updated.status === 'published' && (!req.body.approvalStatus || req.body.approvalStatus === 'pending')) {
-      updated.approvalStatus = 'approved';
-    }
+    const status = req.body.status !== undefined ? req.body.status : prev.status;
+    const isPub = status === 'published';
+    const updated = {
+      ...prev,
+      ...req.body,
+      status,
+      approvalStatus: isPub ? 'approved' : (req.body.approvalStatus !== undefined ? req.body.approvalStatus : prev.approvalStatus),
+      whatYouLearn: Array.isArray(req.body.whatYouLearn) ? req.body.whatYouLearn : (prev.whatYouLearn || []),
+      requirements: Array.isArray(req.body.requirements) ? req.body.requirements : (prev.requirements || []),
+      sections: Array.isArray(req.body.sections) ? req.body.sections : (prev.sections || [])
+    };
     db.courses[idx] = updated;
     saveDB(db);
     await syncRecordToSupabase('courses', updated);
@@ -2686,47 +2748,74 @@ export function createApiRouter() {
   });
 
   // Admin directly creates a course assigned to this instructor
-  router.post('/admin/instructors/:id/create-course', (req, res) => {
+  router.post('/admin/instructors/:id/create-course', async (req, res) => {
+    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
     const id = Number(req.params.id);
     const inst = db.instructors.find(i => i.id === id);
     if (!inst) return res.status(404).json({ error: 'Instructor not found' });
 
+    const cleanTitle = (req.body.title || 'Untitled Course').trim();
+    const baseSlug = cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const courseId = nextId(db.courses);
+    const slug = req.body.slug || (baseSlug ? `${baseSlug}-${courseId}` : `course-${courseId}`);
+
     const newCourse = {
       ...req.body,
-      id: nextId(db.courses),
+      id: courseId,
+      title: cleanTitle,
+      slug,
       instructorId: id,
       instructorName: inst.name,
+      categoryName: req.body.categoryName || req.body.category || 'Business Strategy',
+      thumbnail: req.body.thumbnail || '/course-business.png',
       status: req.body.status || 'published',
       approvalStatus: 'approved',
       enrolledCount: 0,
       rating: 5.0,
+      whatYouLearn: Array.isArray(req.body.whatYouLearn) ? req.body.whatYouLearn : [],
+      requirements: Array.isArray(req.body.requirements) ? req.body.requirements : [],
+      sections: Array.isArray(req.body.sections) ? req.body.sections : [],
       createdAt: new Date().toISOString()
     };
-    db.courses.push(newCourse);
+    db.courses.unshift(newCourse);
     inst.courseCount = (inst.courseCount || 0) + 1;
     db.stats.totalCourses = db.courses.length;
     saveDB(db);
+    await syncRecordToSupabase('courses', newCourse);
     res.status(201).json(newCourse);
   });
 
   // Admin writes a blog article under this instructor's name
-  router.post('/admin/instructors/:id/create-blog', (req, res) => {
+  router.post('/admin/instructors/:id/create-blog', async (req, res) => {
+    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
     const id = Number(req.params.id);
     const inst = db.instructors.find(i => i.id === id);
     if (!inst) return res.status(404).json({ error: 'Instructor not found' });
 
+    const cleanTitle = (req.body.title || 'Untitled Article').trim();
+    const slug = req.body.slug || cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const postId = nextId(db.blog || []);
+
     const post = {
       ...req.body,
-      id: nextId(db.blog || []),
+      id: postId,
+      title: cleanTitle,
+      slug: slug || `article-${postId}`,
       author: inst.name,
+      authorName: inst.name,
+      authorId: id,
+      authorRole: 'instructor',
       published: true,
+      status: 'published',
       publishedAt: new Date().toISOString()
     };
     db.blog = db.blog || [];
     db.blog.unshift(post);
+    db.posts = db.blog;
     saveDB(db);
+    await syncPostToSupabase(post);
     res.status(201).json(post);
   });
 

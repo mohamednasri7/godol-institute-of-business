@@ -34,6 +34,7 @@ function Field({ label, children }) {
 export default function AdminCourses() {
   const [courses, setCourses] = useState([]);
   const [instructors, setInstructors] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showModal, setShowModal] = useState(false);
@@ -41,17 +42,20 @@ export default function AdminCourses() {
   const [toast, setToast] = useState(null);
   const [form, setForm] = useState({
     title: '', description: '', price: 0, level: 'Beginner',
-    categoryName: '', instructorId: null, instructorName: '', thumbnail: '',
-    status: 'draft', approvalStatus: 'pending', featured: false
+    categoryName: 'Business Strategy', instructorId: null, instructorName: '', thumbnail: '/course-business.png',
+    status: 'published', approvalStatus: 'approved', featured: false
   });
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
   const fetchCourses = () => apiFetch('/api/admin/courses').then(setCourses).catch(console.error);
   const fetchInstructors = () => apiFetch('/api/admin/instructors').then(setInstructors).catch(() => {});
+  const fetchCategories = () => apiFetch('/api/categories').then(setCategories).catch(() => {});
+
   useEffect(() => {
     fetchCourses();
     fetchInstructors();
+    fetchCategories();
   }, []);
 
   const handleThumbnailUpload = (e) => {
@@ -68,9 +72,13 @@ export default function AdminCourses() {
     setEditingCourse(null);
     setForm({
       title: '', description: '', price: 0, level: 'Beginner',
-      categoryName: '', instructorId: instructors[0]?.id || null,
+      categoryName: categories[0]?.name || 'Business Strategy',
+      instructorId: instructors[0]?.id || null,
       instructorName: instructors[0]?.name || '',
-      thumbnail: '', status: 'draft', approvalStatus: 'pending', featured: false
+      thumbnail: '/course-business.png',
+      status: 'published',
+      approvalStatus: 'approved',
+      featured: false
     });
     setShowModal(true);
   };
@@ -79,25 +87,32 @@ export default function AdminCourses() {
     setEditingCourse(c);
     setForm({
       title: c.title, description: c.description, price: c.price, level: c.level,
-      categoryName: c.categoryName, instructorId: c.instructorId || null,
+      categoryName: c.categoryName || 'Business Strategy',
+      instructorId: c.instructorId || null,
       instructorName: c.instructorName || '',
-      thumbnail: c.thumbnail || '', status: c.status, approvalStatus: c.approvalStatus, featured: !!c.featured
+      thumbnail: c.thumbnail || '/course-business.png',
+      status: c.status || 'published',
+      approvalStatus: c.approvalStatus || 'approved',
+      featured: !!c.featured
     });
     setShowModal(true);
   };
 
   const handleSave = async () => {
     try {
+      const status = form.status || 'published';
+      const isPub = status === 'published';
       const payload = {
         ...form,
-        approvalStatus: form.status === 'published' ? 'approved' : (form.approvalStatus || 'pending')
+        status,
+        approvalStatus: isPub ? 'approved' : (form.approvalStatus || 'pending')
       };
       if (editingCourse) {
         await apiFetch(`/api/admin/courses/${editingCourse.id}`, { method: 'PUT', body: JSON.stringify(payload) });
-        showToast('Course updated.');
+        showToast('Course updated successfully.');
       } else {
         await apiFetch('/api/admin/courses', { method: 'POST', body: JSON.stringify(payload) });
-        showToast('Course created.');
+        showToast('Course created and published live on website!');
       }
       setShowModal(false);
       fetchCourses();
@@ -339,13 +354,25 @@ export default function AdminCourses() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Category">
-                  <input
+                  <select
                     value={form.categoryName}
                     onChange={e => setForm(f => ({ ...f, categoryName: e.target.value }))}
                     onKeyDown={e => e.stopPropagation()}
                     className={inputCls}
-                    placeholder="e.g. Business Strategy"
-                  />
+                  >
+                    {(categories && categories.length > 0 ? categories : [
+                      { id: 1, name: 'Business Strategy' },
+                      { id: 2, name: 'Finance & Accounting' },
+                      { id: 3, name: 'Entrepreneurship' },
+                      { id: 4, name: 'Digital Marketing' },
+                      { id: 5, name: 'Leadership & HR' },
+                      { id: 6, name: 'Live Workshops' }
+                    ]).map(cat => (
+                      <option key={cat.id || cat.name} value={cat.name}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
                 <Field label="Faculty Instructor">
                   <select
@@ -413,12 +440,19 @@ export default function AdminCourses() {
                 <Field label="Publish Status">
                   <select
                     value={form.status}
-                    onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                    onChange={e => {
+                      const newStatus = e.target.value;
+                      setForm(f => ({
+                        ...f,
+                        status: newStatus,
+                        approvalStatus: newStatus === 'published' ? 'approved' : f.approvalStatus
+                      }));
+                    }}
                     onKeyDown={e => e.stopPropagation()}
                     className={inputCls}
                   >
-                    <option value="draft">Draft</option>
-                    <option value="published">Published</option>
+                    <option value="published">Published (Live on Website)</option>
+                    <option value="draft">Draft (Hidden from Website)</option>
                     <option value="archived">Archived</option>
                   </select>
                 </Field>
@@ -429,8 +463,8 @@ export default function AdminCourses() {
                     onKeyDown={e => e.stopPropagation()}
                     className={inputCls}
                   >
-                    <option value="pending">Pending</option>
                     <option value="approved">Approved</option>
+                    <option value="pending">Pending</option>
                     <option value="rejected">Rejected</option>
                   </select>
                 </Field>
