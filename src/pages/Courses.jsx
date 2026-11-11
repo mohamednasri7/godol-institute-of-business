@@ -33,32 +33,48 @@ export default function Courses() {
 
   useEffect(() => {
     setIsLoading(true);
-    Promise.all([apiFetch('/api/courses'), apiFetch('/api/categories')])
-      .then(([coursesData, categoriesData]) => {
-        setCourses(coursesData);
-        setCategories(categoriesData);
+    Promise.allSettled([apiFetch('/api/courses'), apiFetch('/api/categories')])
+      .then(([coursesRes, categoriesRes]) => {
+        if (coursesRes.status === 'fulfilled' && Array.isArray(coursesRes.value)) {
+          setCourses(coursesRes.value);
+        } else if (coursesRes.status === 'fulfilled' && coursesRes.value && Array.isArray(coursesRes.value.courses)) {
+          setCourses(coursesRes.value.courses);
+        }
+        if (categoriesRes.status === 'fulfilled' && Array.isArray(categoriesRes.value)) {
+          setCategories(categoriesRes.value);
+        }
       })
-      .catch((err) => console.error(err))
+      .catch((err) => console.error('Failed to load courses or categories:', err))
       .finally(() => setIsLoading(false));
   }, []);
 
+  const safeCourses = Array.isArray(courses) ? courses : [];
+
   // Filter and sort courses
-  const filteredCourses = courses.filter((course) => {
-    const query = searchQuery.toLowerCase().trim();
+  const filteredCourses = safeCourses.filter((course) => {
+    if (!course) return false;
+    const query = (searchQuery || '').toLowerCase().trim();
+    const title = (course.title || '').toLowerCase();
+    const desc = (course.description || '').toLowerCase();
+    const cat = (course.categoryName || course.category || '').toLowerCase();
+    const inst = (course.instructorName || '').toLowerCase();
+
     const matchesSearch =
       !query ||
-      course.title.toLowerCase().includes(query) ||
-      course.description.toLowerCase().includes(query) ||
-      (course.categoryName && course.categoryName.toLowerCase().includes(query)) ||
-      (course.instructorName && course.instructorName.toLowerCase().includes(query));
+      title.includes(query) ||
+      desc.includes(query) ||
+      cat.includes(query) ||
+      inst.includes(query);
 
     const matchesCategory =
+      !selectedCategory ||
       selectedCategory === 'all' ||
-      (course.categoryName && course.categoryName.toLowerCase() === selectedCategory.toLowerCase());
+      cat === selectedCategory.toLowerCase();
 
     const matchesLevel =
+      !selectedLevel ||
       selectedLevel === 'all' ||
-      (course.level && course.level.toLowerCase() === selectedLevel.toLowerCase());
+      (course.level || '').toLowerCase() === selectedLevel.toLowerCase();
 
     return matchesSearch && matchesCategory && matchesLevel;
   });

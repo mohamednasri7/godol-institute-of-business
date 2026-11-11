@@ -33,9 +33,16 @@ export default function Home() {
 
   useEffect(() => {
     apiFetch('/api/stats').then(setStats).catch(() => { });
-    apiFetch('/api/courses/featured').then(setFeaturedCourses).catch(() => { });
-    apiFetch('/api/instructors').then(setInstructors).catch(() => { });
-    apiFetch('/api/workshops').then(setWorkshops).catch(() => { });
+    apiFetch('/api/courses/featured').then(res => {
+      if (Array.isArray(res)) setFeaturedCourses(res);
+      else if (res && Array.isArray(res.courses)) setFeaturedCourses(res.courses);
+    }).catch(() => { });
+    apiFetch('/api/instructors').then(res => {
+      if (Array.isArray(res)) setInstructors(res);
+    }).catch(() => { });
+    apiFetch('/api/workshops').then(res => {
+      if (Array.isArray(res)) setWorkshops(res);
+    }).catch(() => { });
     apiFetch('/api/settings').then(res => setSettings(res.map || {})).catch(() => { });
   }, []);
 
@@ -438,7 +445,7 @@ export default function Home() {
             </Link>
           </div>
 
-          {featuredCourses.length > 0 ? (
+          {(Array.isArray(featuredCourses) && featuredCourses.length > 0) ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {featuredCourses.map((course) => (
                 <CourseCard key={course.id} course={course} />
