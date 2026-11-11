@@ -306,16 +306,16 @@ export async function deletePostFromSupabase(id) {
   if (!isSupabaseConfigured || !supabase) return;
   try {
     await supabase.from('blog_posts').delete().eq('id', id);
-  } catch (err) {}
+  } catch (err) { }
   try {
     await supabase.from('posts').delete().eq('id', id);
-  } catch (err) {}
+  } catch (err) { }
   try {
     await supabase.from('post_metrics').delete().eq('post_id', id);
-  } catch (err) {}
+  } catch (err) { }
   try {
     await supabase.from('post_comments').delete().eq('post_id', id);
-  } catch (err) {}
+  } catch (err) { }
 }
 
 // Upsert single item to Supabase immediately (awaited for serverless resilience)
@@ -528,7 +528,7 @@ export async function ensureFreshData(force = false) {
 // are pulled automatically into the dashboard and website without needing a reload
 if (isSupabaseConfigured) {
   const syncInterval = setInterval(() => {
-    ensureFreshData().catch(() => {});
+    ensureFreshData().catch(() => { });
   }, 5000);
   if (syncInterval.unref) syncInterval.unref();
 }
@@ -876,7 +876,7 @@ export function createApiRouter() {
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.from('course_modules').delete().eq('id', modId);
-      } catch {}
+      } catch { }
     }
 
     res.json({ success: true, deletedModuleId: modId });
@@ -956,7 +956,7 @@ export function createApiRouter() {
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.from('course_lessons').delete().eq('id', lessonId);
-      } catch {}
+      } catch { }
     }
 
     res.json({ success: true, deletedLessonId: lessonId });
@@ -1151,7 +1151,7 @@ export function createApiRouter() {
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.from('lesson_notes').delete().eq('id', noteId);
-      } catch {}
+      } catch { }
     }
 
     res.json({ success: true, deletedNoteId: noteId });
@@ -1324,9 +1324,9 @@ export function createApiRouter() {
     }
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter(p => 
-        (p.title || '').toLowerCase().includes(q) || 
-        (p.content || '').toLowerCase().includes(q) || 
+      list = list.filter(p =>
+        (p.title || '').toLowerCase().includes(q) ||
+        (p.content || '').toLowerCase().includes(q) ||
         (p.excerpt || '').toLowerCase().includes(q)
       );
     }
@@ -1615,8 +1615,8 @@ export function createApiRouter() {
     // Check for existing enrollment with access
     const existing = db.enrollments.find(
       e => e.courseId === Number(courseId) &&
-           e.studentEmail.toLowerCase() === studentEmail.toLowerCase() &&
-           (e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed')
+        e.studentEmail.toLowerCase() === studentEmail.toLowerCase() &&
+        (e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed')
     );
     if (existing) {
       return res.json({ existing: true, enrollment: existing });
@@ -1625,8 +1625,8 @@ export function createApiRouter() {
     // Check for pending enrollment (avoid duplicates)
     const pendingExisting = db.enrollments.find(
       e => e.courseId === Number(courseId) &&
-           e.studentEmail.toLowerCase() === studentEmail.toLowerCase() &&
-           ['pending_payment', 'pending_verification', 'pending_approval'].includes(e.enrollmentStatus)
+        e.studentEmail.toLowerCase() === studentEmail.toLowerCase() &&
+        ['pending_payment', 'pending_verification', 'pending_approval'].includes(e.enrollmentStatus)
     );
     if (pendingExisting) {
       return res.json({ existing: false, enrollment: pendingExisting });
@@ -1682,7 +1682,7 @@ export function createApiRouter() {
 
     const enrollment = db.enrollments.find(
       e => e.id === Number(enrollmentId) &&
-           e.studentEmail.toLowerCase() === studentEmail.toLowerCase()
+        e.studentEmail.toLowerCase() === studentEmail.toLowerCase()
     );
     if (!enrollment) return res.status(404).json({ error: 'Enrollment not found' });
 
@@ -1779,8 +1779,8 @@ export function createApiRouter() {
 
     const enrollment = db.enrollments.find(
       e => e.courseId === Number(courseId) &&
-           e.studentEmail.toLowerCase() === email.toLowerCase() &&
-           e.accessGranted === true
+        e.studentEmail.toLowerCase() === email.toLowerCase() &&
+        e.accessGranted === true
     );
     res.json({ hasAccess: !!enrollment, enrollment: enrollment || null });
   });
@@ -2833,7 +2833,7 @@ export function createApiRouter() {
     }
     const db = loadDB();
     const cleanEmail = email.trim().toLowerCase();
-    const instructor = db.instructors.find(i => 
+    const instructor = db.instructors.find(i =>
       i.email && i.email.trim().toLowerCase() === cleanEmail
     );
     if (!instructor) {

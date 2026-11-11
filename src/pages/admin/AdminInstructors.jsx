@@ -1145,9 +1145,19 @@ export default function AdminInstructors() {
 
       {/* ────────────────── MODAL 3: POST COURSE FOR INSTRUCTOR ────────────────── */}
       {courseModalInstructor && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setCourseModalInstructor(null);
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
             <button
+              type="button"
               onClick={() => setCourseModalInstructor(null)}
               className="absolute top-5 right-5 text-gray-400 hover:text-gray-600"
             >
@@ -1165,7 +1175,7 @@ export default function AdminInstructors() {
               Directly publish a course taught by this instructor
             </p>
 
-            <form onSubmit={handleCreateCourseForInstructor} className="space-y-4 text-xs">
+            <form onSubmit={handleCreateCourseForInstructor} className="space-y-4 text-xs" onKeyDown={(e) => e.stopPropagation()}>
               <div>
                 <label className="block font-semibold mb-1 text-gray-700">Course Title *</label>
                 <input
@@ -1174,6 +1184,7 @@ export default function AdminInstructors() {
                   placeholder="e.g. Strategic Management & East African Markets"
                   value={courseForm.title}
                   onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+                  onKeyDown={(e) => e.stopPropagation()}
                   className="w-full h-9 px-3 rounded-xl border border-gray-200 outline-none focus:border-primary"
                 />
               </div>

@@ -19,6 +19,18 @@ const APPROVAL_COLOR = {
   rejected: 'bg-red-100 text-red-600'
 };
 
+const inputCls = "w-full h-11 px-4 rounded-xl border border-gray-200 text-sm outline-none focus:border-primary";
+
+// Stable Field component declared outside render function so inputs do not lose focus on state updates
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-gray-700 mb-1.5">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 export default function AdminCourses() {
   const [courses, setCourses] = useState([]);
   const [instructors, setInstructors] = useState([]);
@@ -150,15 +162,6 @@ export default function AdminCourses() {
     return matchQ && matchStatus;
   });
 
-  const Field = ({ label, children }) => (
-    <div>
-      <label className="block text-xs font-semibold text-gray-700 mb-1.5">{label}</label>
-      {children}
-    </div>
-  );
-
-  const inputCls = "w-full h-11 px-4 rounded-xl border border-gray-200 text-sm outline-none focus:border-primary";
-
   return (
     <AdminLayout title="Course Management" subtitle="Manage all courses — approve, publish, and configure">
       {toast && (
@@ -277,33 +280,72 @@ export default function AdminCourses() {
 
       {/* Add/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 my-8">
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowModal(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 my-8"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-gray-900">{editingCourse ? 'Edit Course' : 'Add New Course'}</h3>
-              <button onClick={() => setShowModal(false)}><X className="w-5 h-5 text-gray-400" /></button>
+              <button type="button" onClick={() => setShowModal(false)}><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="space-y-4">
               <Field label="Course Title *">
-                <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} className={inputCls} placeholder="e.g. Business Strategy Masterclass" />
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  onKeyDown={e => e.stopPropagation()}
+                  className={inputCls}
+                  placeholder="e.g. Business Strategy Masterclass"
+                  autoComplete="off"
+                />
               </Field>
               <Field label="Description">
-                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-primary resize-none" />
+                <textarea
+                  value={form.description}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  onKeyDown={e => e.stopPropagation()}
+                  rows={3}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-primary resize-none"
+                />
               </Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Price (USD)">
-                  <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))} className={inputCls} />
+                  <input
+                    type="number"
+                    value={form.price}
+                    onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))}
+                    onKeyDown={e => e.stopPropagation()}
+                    className={inputCls}
+                  />
                 </Field>
                 <Field label="Level">
-                  <select value={form.level} onChange={e => setForm(f => ({ ...f, level: e.target.value }))} className={inputCls}>
+                  <select
+                    value={form.level}
+                    onChange={e => setForm(f => ({ ...f, level: e.target.value }))}
+                    onKeyDown={e => e.stopPropagation()}
+                    className={inputCls}
+                  >
                     {['Beginner', 'Intermediate', 'Advanced', 'All Levels'].map(l => <option key={l}>{l}</option>)}
                   </select>
                 </Field>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Category">
-                  <input value={form.categoryName} onChange={e => setForm(f => ({ ...f, categoryName: e.target.value }))} className={inputCls} placeholder="e.g. Business Strategy" />
+                  <input
+                    value={form.categoryName}
+                    onChange={e => setForm(f => ({ ...f, categoryName: e.target.value }))}
+                    onKeyDown={e => e.stopPropagation()}
+                    className={inputCls}
+                    placeholder="e.g. Business Strategy"
+                  />
                 </Field>
                 <Field label="Faculty Instructor">
                   <select
@@ -317,6 +359,7 @@ export default function AdminCourses() {
                         instructorName: inst ? inst.name : ''
                       }));
                     }}
+                    onKeyDown={e => e.stopPropagation()}
                     className={inputCls}
                   >
                     <option value="">Select Instructor...</option>
@@ -359,6 +402,7 @@ export default function AdminCourses() {
                     <input
                       value={form.thumbnail}
                       onChange={e => setForm(f => ({ ...f, thumbnail: e.target.value }))}
+                      onKeyDown={e => e.stopPropagation()}
                       className="w-full h-8 px-2.5 text-xs bg-white rounded-lg border border-gray-200 outline-none"
                       placeholder="Or paste image URL (https://...)"
                     />
@@ -367,14 +411,24 @@ export default function AdminCourses() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Publish Status">
-                  <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className={inputCls}>
+                  <select
+                    value={form.status}
+                    onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                    onKeyDown={e => e.stopPropagation()}
+                    className={inputCls}
+                  >
                     <option value="draft">Draft</option>
                     <option value="published">Published</option>
                     <option value="archived">Archived</option>
                   </select>
                 </Field>
                 <Field label="Approval Status">
-                  <select value={form.approvalStatus} onChange={e => setForm(f => ({ ...f, approvalStatus: e.target.value }))} className={inputCls}>
+                  <select
+                    value={form.approvalStatus}
+                    onChange={e => setForm(f => ({ ...f, approvalStatus: e.target.value }))}
+                    onKeyDown={e => e.stopPropagation()}
+                    className={inputCls}
+                  >
                     <option value="pending">Pending</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
@@ -382,13 +436,18 @@ export default function AdminCourses() {
                 </Field>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={form.featured} onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))} className="w-4 h-4 accent-primary" />
+                <input
+                  type="checkbox"
+                  checked={form.featured}
+                  onChange={e => setForm(f => ({ ...f, featured: e.target.checked }))}
+                  className="w-4 h-4 accent-primary"
+                />
                 <span className="text-sm text-gray-700 font-medium">Feature this course on homepage</span>
               </label>
             </div>
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-sm text-gray-600 font-semibold">Cancel</button>
-              <button onClick={handleSave} className="flex-1 py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90">
+              <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-3 rounded-xl border border-gray-200 text-sm text-gray-600 font-semibold">Cancel</button>
+              <button type="button" onClick={handleSave} className="flex-1 py-3 rounded-xl bg-primary text-white font-bold text-sm hover:bg-primary/90">
                 {editingCourse ? 'Save Changes' : 'Create Course'}
               </button>
             </div>

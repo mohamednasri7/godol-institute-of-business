@@ -30,7 +30,7 @@ export default function AdminLogin() {
       // First try to reset any lockout
       try {
         await apiFetch('/api/admin/reset-lockout', { method: 'POST' });
-      } catch {}
+      } catch { }
 
       const res = await apiFetch('/api/admin/login', {
         method: 'POST',

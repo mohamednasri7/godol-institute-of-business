@@ -82,8 +82,17 @@ export default function AdminCategories() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6">
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowModal(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-bold text-gray-900">{editing ? 'Edit Category' : 'Add Category'}</h3>
               <button onClick={() => setShowModal(false)}><X className="w-5 h-5 text-gray-400" /></button>
