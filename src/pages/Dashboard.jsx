@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('courses');
 
   const [enrollments, setEnrollments] = useState([]);
+  const [pendingEnrollments, setPendingEnrollments] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [workshops, setWorkshops] = useState([]);
   const [settings, setSettings] = useState([]);
@@ -47,10 +48,13 @@ export default function Dashboard() {
       apiFetch('/api/workshops')
     ])
       .then(([enrollData, certData, workshopData]) => {
-        // Only show approved/completed enrollments where access is granted
-        setEnrollments(enrollData.filter(e => e.accessGranted === true || e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed'));
-        setCertificates(certData);
-        setWorkshops(workshopData);
+        const allEnr = Array.isArray(enrollData) ? enrollData : [];
+        const approved = allEnr.filter(e => e.accessGranted === true || e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed');
+        const pending = allEnr.filter(e => e.enrollmentStatus === 'pending_verification' || e.paymentStatus === 'pending_verification');
+        setEnrollments(approved);
+        setPendingEnrollments(pending);
+        setCertificates(certData || []);
+        setWorkshops(workshopData || []);
       })
       .catch((err) => console.error(err))
       .finally(() => setIsLoading(false));
@@ -202,6 +206,39 @@ export default function Dashboard() {
 
       {/* Main Tab Views */}
       <div className="container mx-auto px-4 md:px-6 py-8">
+        {/* Pending Payment Verification Banner */}
+        {pendingEnrollments.length > 0 && (
+          <div className="mb-8 bg-amber-500/10 border border-amber-500/30 rounded-3xl p-5 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-500 flex items-center justify-center flex-shrink-0 border border-amber-500/30">
+                <Clock className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 uppercase tracking-wider">
+                  Payment Under Review
+                </span>
+                <h3 className="font-bold text-base text-foreground mt-1">
+                  {pendingEnrollments.length === 1
+                    ? `Payment Awaiting Admin Verification for "${pendingEnrollments[0].courseTitle}"`
+                    : `${pendingEnrollments.length} Payments Awaiting Verification`}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  We have received your receipt. An administrator is verifying your transfer to activate your course access.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5 w-full md:w-auto">
+              <Link
+                href={`/checkout/${pendingEnrollments[0].id}`}
+                className="w-full md:w-auto px-5 py-2.5 rounded-xl font-bold text-xs text-center transition-all hover:scale-105"
+                style={{ background: 'hsl(42 92% 52%)', color: 'hsl(215 50% 12%)' }}
+              >
+                View Status & Receipt
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* TAB 1: COURSES */}
         {activeTab === 'courses' && (
           <div className="space-y-8">

@@ -1621,6 +1621,7 @@ export function createApiRouter() {
   // ─────────── CHECKOUT / ENROLLMENT INITIATION ───────────
   // Step 1: Student initiates enrollment → creates pending_payment enrollment
   router.post('/checkout', async (req, res) => {
+    await ensureFreshData();
     const db = loadDB();
     const { courseId, studentEmail, studentName, studentPhone } = req.body;
 
@@ -1632,7 +1633,7 @@ export function createApiRouter() {
     if (!course) return res.status(404).json({ error: 'Course not found' });
 
     // Check if student account is active
-    const student = db.students.find(s => s.email.toLowerCase() === studentEmail.toLowerCase());
+    const student = db.students.find(s => s.email?.toLowerCase() === studentEmail.toLowerCase().trim());
     if (student && student.status === 'suspended') {
       return res.status(403).json({ error: 'Your account has been suspended. Please contact support.' });
     }
@@ -1640,8 +1641,8 @@ export function createApiRouter() {
     // Check for existing enrollment with access
     const existing = db.enrollments.find(
       e => e.courseId === Number(courseId) &&
-        e.studentEmail.toLowerCase() === studentEmail.toLowerCase() &&
-        (e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed')
+        e.studentEmail?.toLowerCase() === studentEmail.toLowerCase().trim() &&
+        (e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed' || e.accessGranted === true)
     );
     if (existing) {
       return res.json({ existing: true, enrollment: existing });
@@ -1650,8 +1651,8 @@ export function createApiRouter() {
     // Check for pending enrollment (avoid duplicates)
     const pendingExisting = db.enrollments.find(
       e => e.courseId === Number(courseId) &&
-        e.studentEmail.toLowerCase() === studentEmail.toLowerCase() &&
-        ['pending_payment', 'pending_verification', 'pending_approval'].includes(e.enrollmentStatus)
+        e.studentEmail?.toLowerCase() === studentEmail.toLowerCase().trim() &&
+        ['pending_payment', 'pending_verification', 'pending_approval', 'awaiting_payment'].includes(e.enrollmentStatus)
     );
     if (pendingExisting) {
       return res.json({ existing: false, enrollment: pendingExisting });
@@ -1661,7 +1662,7 @@ export function createApiRouter() {
     const enrollment = {
       id: nextId(db.enrollments),
       studentName: studentName || student?.name || studentEmail.split('@')[0],
-      studentEmail: studentEmail.toLowerCase(),
+      studentEmail: studentEmail.toLowerCase().trim(),
       studentPhone: studentPhone || student?.phone || '',
       courseId: Number(courseId),
       courseTitle: course.title,
@@ -1687,8 +1688,9 @@ export function createApiRouter() {
   });
 
   // ─────────── PAYMENT SUBMISSION ───────────
-  // Step 2: Student submits payment transaction details
+  // Step 2: Student submits payment transaction details and receipt
   router.post('/payments/submit', async (req, res) => {
+    await ensureFreshData();
     const db = loadDB();
     const {
       enrollmentId,
@@ -1697,72 +1699,101 @@ export function createApiRouter() {
       senderPhone,
       transactionRef,
       claimedAmount,
+      receiptUrl,
       paymentDate,
       adminNotes
     } = req.body;
 
-    if (!enrollmentId || !studentEmail || !transactionRef || !claimedAmount) {
-      return res.status(400).json({ error: 'enrollmentId, studentEmail, transactionRef and claimedAmount are required' });
+    if (!enrollmentId) {
+      return res.status(400).json({ error: 'enrollmentId is required' });
     }
 
-    const enrollment = db.enrollments.find(
-      e => e.id === Number(enrollmentId) &&
-        e.studentEmail.toLowerCase() === studentEmail.toLowerCase()
-    );
-    if (!enrollment) return res.status(404).json({ error: 'Enrollment not found' });
+    const id = Number(enrollmentId);
+    let enrollment = db.enrollments.find(e => e.id === id);
 
-    if (enrollment.enrollmentStatus === 'approved' || enrollment.accessGranted) {
-      return res.status(400).json({ error: 'This course is already active for your account.' });
-    }
-
-    // Check for duplicate transaction reference
-    const dupRef = db.payments.find(
-      p => p.transactionRef === transactionRef && p.status === 'verified'
-    );
-    if (dupRef) {
-      return res.status(400).json({ error: 'This transaction reference has already been used. Please check your reference number.' });
-    }
-
-    // Also check for already-pending payment to prevent double submission
-    if (enrollment.paymentId && enrollment.paymentStatus === 'pending_verification') {
-      const existingPay = db.payments.find(p => p.id === enrollment.paymentId && p.status === 'pending_verification');
-      if (existingPay) {
-        return res.status(400).json({ error: 'A payment submission is already awaiting verification for this enrollment. Please wait for admin review.' });
+    // If not found in memory, query Supabase directly
+    if (!enrollment && supabase) {
+      try {
+        const { data: supaEnr, error: supaErr } = await supabase.from('enrollments').select('*').eq('id', id).maybeSingle();
+        if (supaEnr && !supaErr) {
+          enrollment = rowToCamel(supaEnr);
+          db.enrollments.push(enrollment);
+        }
+      } catch (err) {
+        console.warn('Could not query Supabase for enrollment:', err.message);
       }
     }
 
-    const student = db.students.find(s => s.email.toLowerCase() === studentEmail.toLowerCase());
+    // Secondary fallback: lookup by student email if id was not found
+    if (!enrollment && studentEmail) {
+      enrollment = db.enrollments.find(
+        e => e.studentEmail?.toLowerCase() === studentEmail.trim().toLowerCase()
+      );
+    }
+
+    if (!enrollment) {
+      return res.status(404).json({ error: 'Enrollment record not found. Please refresh or return to the course page.' });
+    }
+
+    if (enrollment.enrollmentStatus === 'approved' || enrollment.accessGranted) {
+      return res.json({ success: true, alreadyActive: true, enrollment });
+    }
+
+    const ref = (transactionRef || senderPhone || `PAY-${enrollment.id}-${Date.now().toString().slice(-6)}`).trim();
+    const amount = Number(claimedAmount) > 0 ? Number(claimedAmount) : (enrollment.coursePrice || 0);
+
+    const student = db.students.find(s => s.email?.toLowerCase() === enrollment.studentEmail?.toLowerCase());
     const course = db.courses.find(c => c.id === enrollment.courseId);
 
-    const payment = {
-      id: nextId(db.payments),
-      enrollmentId: enrollment.id,
-      courseId: enrollment.courseId,
-      courseTitle: enrollment.courseTitle,
-      coursePrice: enrollment.coursePrice,
-      studentName: enrollment.studentName,
-      studentEmail: enrollment.studentEmail,
-      studentPhone: enrollment.studentPhone || student?.phone || '',
-      studentWhatsapp: student?.whatsapp || '',
-      provider: provider || 'EVC Plus',
-      senderPhone: senderPhone || '',
-      transactionRef: transactionRef.trim(),
-      claimedAmount: Number(claimedAmount),
-      verifiedAmount: null,
-      currency: 'USD',
-      status: 'pending_verification',
-      paymentDate: paymentDate || null,
-      submittedAt: new Date().toISOString(),
-      verifiedAt: null,
-      verifiedBy: null,
-      rejectedAt: null,
-      rejectedBy: null,
-      rejectionReason: null,
-      adminNotes: adminNotes || '',
-      receiptUrl: null
-    };
+    // Check if an existing payment is already pending for this enrollment
+    let payment = null;
+    if (enrollment.paymentId) {
+      payment = db.payments.find(p => p.id === enrollment.paymentId);
+    }
+    if (!payment) {
+      payment = db.payments.find(p => p.enrollmentId === enrollment.id && p.status === 'pending_verification');
+    }
 
-    db.payments.push(payment);
+    if (payment) {
+      // Update existing pending payment record
+      payment.provider = provider || payment.provider || 'Sahal';
+      if (senderPhone) payment.senderPhone = senderPhone;
+      payment.transactionRef = ref;
+      payment.claimedAmount = amount;
+      if (receiptUrl) payment.receiptUrl = receiptUrl;
+      payment.submittedAt = new Date().toISOString();
+      if (adminNotes) payment.adminNotes = adminNotes;
+    } else {
+      // Create new payment record
+      payment = {
+        id: nextId(db.payments),
+        enrollmentId: enrollment.id,
+        courseId: enrollment.courseId,
+        courseTitle: enrollment.courseTitle,
+        coursePrice: enrollment.coursePrice,
+        studentName: enrollment.studentName,
+        studentEmail: enrollment.studentEmail,
+        studentPhone: enrollment.studentPhone || student?.phone || senderPhone || '',
+        studentWhatsapp: student?.whatsapp || '',
+        provider: provider || 'Sahal',
+        senderPhone: senderPhone || '',
+        transactionRef: ref,
+        claimedAmount: amount,
+        verifiedAmount: null,
+        currency: 'USD',
+        status: 'pending_verification',
+        paymentDate: paymentDate || new Date().toISOString(),
+        submittedAt: new Date().toISOString(),
+        verifiedAt: null,
+        verifiedBy: null,
+        rejectedAt: null,
+        rejectedBy: null,
+        rejectionReason: null,
+        adminNotes: adminNotes || '',
+        receiptUrl: receiptUrl || null
+      };
+      db.payments.push(payment);
+    }
 
     // Update enrollment
     enrollment.paymentId = payment.id;
@@ -1774,23 +1805,62 @@ export function createApiRouter() {
     // Notification for admin (will show in dashboard)
     addNotification(db, 'new_payment_submission',
       'admin@godolinstitute.so',
-      `New payment submitted by ${enrollment.studentName} for "${enrollment.courseTitle}" — Ref: ${transactionRef}`
+      `New payment submitted by ${enrollment.studentName} for "${enrollment.courseTitle}" — Ref: ${ref} ($${amount} USD)`
     );
     saveDB(db);
 
     await syncRecordToSupabase('payments', payment);
     await syncRecordToSupabase('enrollments', enrollment);
 
-    res.status(201).json({ success: true, payment });
+    res.status(201).json({ success: true, payment, enrollment });
   });
 
   // ─────────── ENROLLMENT QUERIES ───────────
 
-  router.get('/enrollments', (req, res) => {
+  // Get single enrollment with payment details
+  router.get('/enrollments/:id', async (req, res) => {
+    await ensureFreshData();
+    const db = loadDB();
+    const id = Number(req.params.id);
+    let enrollment = db.enrollments.find(e => e.id === id);
+
+    if (!enrollment && supabase) {
+      try {
+        const { data } = await supabase.from('enrollments').select('*').eq('id', id).maybeSingle();
+        if (data) {
+          enrollment = rowToCamel(data);
+          if (!db.enrollments.some(e => e.id === enrollment.id)) db.enrollments.push(enrollment);
+        }
+      } catch (err) {
+        console.warn('Supabase fetch error:', err.message);
+      }
+    }
+
+    if (!enrollment) {
+      return res.status(404).json({ error: 'Enrollment not found' });
+    }
+
+    // Look up matching payment
+    let payment = db.payments.find(p => p.enrollmentId === id || (enrollment.paymentId && p.id === enrollment.paymentId));
+    if (!payment && supabase) {
+      try {
+        const { data: payData } = await supabase.from('payments').select('*').eq('enrollment_id', id).order('id', { ascending: false }).limit(1).maybeSingle();
+        if (payData) {
+          payment = rowToCamel(payData);
+          if (!db.payments.some(p => p.id === payment.id)) db.payments.push(payment);
+        }
+      } catch (err) {}
+    }
+
+    res.json({ enrollment, payment: payment || null });
+  });
+
+  router.get('/enrollments', async (req, res) => {
+    await ensureFreshData();
     const db = loadDB();
     const { email } = req.query;
     if (email) {
-      const userEnrollments = db.enrollments.filter(e => e.studentEmail?.toLowerCase() === email.toLowerCase());
+      const userEnrollments = db.enrollments.filter(e => e.studentEmail?.toLowerCase() === email.toLowerCase().trim());
       return res.json(userEnrollments);
     }
     res.json(db.enrollments);

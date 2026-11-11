@@ -113,6 +113,10 @@ export default function CourseDetail() {
     }
 
     if (accessStatus === 'pending_verification') {
+      if (enrollment?.id) {
+        setLocation(`/checkout/${enrollment.id}`);
+        return;
+      }
       setLocation('/dashboard');
       return;
     }
@@ -194,9 +198,13 @@ export default function CourseDetail() {
     }
     if (accessStatus === 'pending_verification') {
       return (
-        <div className="w-full py-3.5 rounded-full bg-amber-100 text-amber-800 font-bold text-xs text-center border border-amber-200">
-          ⏳ Payment Awaiting Admin Verification
-        </div>
+        <button
+          onClick={() => enrollment?.id && setLocation(`/checkout/${enrollment.id}`)}
+          className="w-full py-3.5 rounded-full bg-amber-400/10 hover:bg-amber-400/20 text-amber-700 dark:text-amber-300 font-bold text-xs text-center border border-amber-400/30 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
+          <span>⏳ Payment Awaiting Verification (Click to View)</span>
+        </button>
       );
     }
     if (accessStatus === 'pending_payment') {

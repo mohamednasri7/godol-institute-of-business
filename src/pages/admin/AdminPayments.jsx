@@ -247,6 +247,12 @@ export default function AdminPayments() {
                           </button>
                         </div>
                         {pay.senderPhone && <div className="text-[11px] text-gray-400 mt-0.5">From: {pay.senderPhone}</div>}
+                        {pay.receiptUrl && (
+                          <a href={pay.receiptUrl} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-semibold mt-1 bg-primary/5 px-2 py-0.5 rounded-md border border-primary/20">
+                            <FileText className="w-3 h-3" /> View Receipt
+                          </a>
+                        )}
                       </td>
                       <td className="py-4 px-5 text-gray-500">
                         {new Date(pay.submittedAt).toLocaleDateString()}<br />
@@ -332,6 +338,18 @@ export default function AdminPayments() {
                   <span className="text-gray-900 font-semibold text-right max-w-[55%] break-all">{v}</span>
                 </div>
               ) : null)}
+
+              {selectedPayment.receiptUrl && (
+                <div className="pt-3 border-t border-gray-100">
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wider block mb-2">Student's Uploaded Receipt</span>
+                  <a href={selectedPayment.receiptUrl} target="_blank" rel="noopener noreferrer" className="block relative group overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-1">
+                    <img src={selectedPayment.receiptUrl} alt="Receipt Screenshot" className="max-h-72 w-full object-contain mx-auto group-hover:scale-[1.02] transition-transform rounded-xl" />
+                    <span className="absolute bottom-3 right-3 px-2.5 py-1 bg-black/80 text-white text-[10px] font-semibold rounded-lg shadow-sm">
+                      Click to open full size
+                    </span>
+                  </a>
+                </div>
+              )}
             </div>
             <div className="mt-5 flex gap-3">
               <WhatsAppButton phone={selectedPayment.studentWhatsapp || selectedPayment.studentPhone}
@@ -366,6 +384,13 @@ export default function AdminPayments() {
               <p className="text-sm font-semibold text-emerald-800">You are verifying:</p>
               <p className="text-sm text-emerald-700 mt-1"><strong>{selectedPayment.studentName}</strong> → "{selectedPayment.courseTitle}"</p>
               <p className="text-sm text-emerald-700 font-mono mt-0.5">Ref: {selectedPayment.transactionRef}</p>
+              {selectedPayment.receiptUrl && (
+                <div className="mt-3 pt-3 border-t border-emerald-200/60">
+                  <a href={selectedPayment.receiptUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-emerald-800 font-bold hover:underline">
+                    <Eye className="w-3.5 h-3.5" /> View Uploaded Receipt Screenshot
+                  </a>
+                </div>
+              )}
             </div>
             <div className="space-y-4">
               <div>
