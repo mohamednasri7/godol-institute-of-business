@@ -646,6 +646,74 @@ function getSettingValue(db, key) {
   return s ? s.value : '';
 }
 
+// Dynamic Course Stats Calculation (Modules, Lessons, Duration, and Enrollments)
+export function enrichCourseWithDynamicStats(course, db) {
+  if (!course) return course;
+  const courseId = Number(course.id);
+
+  // 1. Get modules
+  const modules = (db.course_modules || []).filter(
+    m => Number(m.courseId || m.course_id) === courseId
+  );
+  const moduleCount = modules.length > 0 
+    ? modules.length 
+    : (Array.isArray(course.sections) ? course.sections.length : 0);
+
+  // 2. Get lessons (from course_lessons or modules or legacy sections)
+  let lessons = (db.course_lessons || []).filter(
+    l => Number(l.courseId || l.course_id) === courseId
+  );
+  if (lessons.length === 0 && Array.isArray(course.sections)) {
+    lessons = course.sections.flatMap(s => s.lessons || []);
+  }
+  const lessonCount = lessons.length;
+
+  // 3. Calculate total duration from lessons if available
+  const totalDurationSeconds = lessons.reduce(
+    (sum, l) => sum + (Number(l.durationSeconds || l.duration_seconds) || 0), 
+    0
+  );
+
+  let durationHours = 0;
+  if (totalDurationSeconds > 0) {
+    durationHours = Math.round((totalDurationSeconds / 3600) * 10) / 10;
+  } else if (lessonCount > 0 && course.durationHours) {
+    durationHours = Number(course.durationHours);
+  } else {
+    durationHours = 0;
+  }
+
+  // 4. Calculate real enrolled count from enrollments table
+  const enrolledCount = (db.enrollments || []).filter(
+    e => (Number(e.courseId || e.course_id) === courseId) &&
+         (e.accessGranted === true || e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed')
+  ).length;
+
+  return {
+    ...course,
+    moduleCount,
+    lessonCount,
+    durationHours,
+    durationSeconds: totalDurationSeconds,
+    enrolledCount: enrolledCount > 0 ? enrolledCount : (Number(course.enrolledCount) || 0)
+  };
+}
+
+export function recalculateAndSyncCourse(courseId, db) {
+  if (!courseId) return;
+  const course = db.courses.find(c => c.id === Number(courseId));
+  if (!course) return;
+  const enriched = enrichCourseWithDynamicStats(course, db);
+  course.lessonCount = enriched.lessonCount;
+  course.moduleCount = enriched.moduleCount;
+  course.durationHours = enriched.durationHours;
+  course.enrolledCount = enriched.enrolledCount;
+  saveDB(db);
+  if (isSupabaseConfigured && supabase) {
+    syncRecordToSupabase('courses', course).catch(() => {});
+  }
+}
+
 export function createApiRouter() {
   const router = express.Router();
 
@@ -748,74 +816,6 @@ export function createApiRouter() {
     });
     res.json({ list: db.settings || [], map });
   });
-
-// Dynamic Course Stats Calculation (Modules, Lessons, Duration, and Enrollments)
-export function enrichCourseWithDynamicStats(course, db) {
-  if (!course) return course;
-  const courseId = Number(course.id);
-
-  // 1. Get modules
-  const modules = (db.course_modules || []).filter(
-    m => Number(m.courseId || m.course_id) === courseId
-  );
-  const moduleCount = modules.length > 0 
-    ? modules.length 
-    : (Array.isArray(course.sections) ? course.sections.length : 0);
-
-  // 2. Get lessons (from course_lessons or modules or legacy sections)
-  let lessons = (db.course_lessons || []).filter(
-    l => Number(l.courseId || l.course_id) === courseId
-  );
-  if (lessons.length === 0 && Array.isArray(course.sections)) {
-    lessons = course.sections.flatMap(s => s.lessons || []);
-  }
-  const lessonCount = lessons.length;
-
-  // 3. Calculate total duration from lessons if available
-  const totalDurationSeconds = lessons.reduce(
-    (sum, l) => sum + (Number(l.durationSeconds || l.duration_seconds) || 0), 
-    0
-  );
-
-  let durationHours = 0;
-  if (totalDurationSeconds > 0) {
-    durationHours = Math.round((totalDurationSeconds / 3600) * 10) / 10;
-  } else if (lessonCount > 0 && course.durationHours) {
-    durationHours = Number(course.durationHours);
-  } else {
-    durationHours = 0;
-  }
-
-  // 4. Calculate real enrolled count from enrollments table
-  const enrolledCount = (db.enrollments || []).filter(
-    e => (Number(e.courseId || e.course_id) === courseId) &&
-         (e.accessGranted === true || e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed')
-  ).length;
-
-  return {
-    ...course,
-    moduleCount,
-    lessonCount,
-    durationHours,
-    durationSeconds: totalDurationSeconds,
-    enrolledCount: enrolledCount > 0 ? enrolledCount : (Number(course.enrolledCount) || 0)
-  };
-}
-
-export function recalculateAndSyncCourse(courseId, db) {
-  if (!courseId) return;
-  const course = db.courses.find(c => c.id === Number(courseId));
-  if (!course) return;
-  const enriched = enrichCourseWithDynamicStats(course, db);
-  course.lessonCount = enriched.lessonCount;
-  course.moduleCount = enriched.moduleCount;
-  course.durationHours = enriched.durationHours;
-  course.enrolledCount = enriched.enrolledCount;
-  saveDB(db);
-  if (isSupabaseConfigured && supabase) {
-    syncRecordToSupabase('courses', course).catch(() => {});
-  }
-}
 
   // Courses
   router.get('/courses', async (req, res) => {
