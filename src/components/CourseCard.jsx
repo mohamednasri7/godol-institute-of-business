@@ -77,11 +77,21 @@ export default function CourseCard({ course }) {
 
         <div className="mt-auto pt-4 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-            <span className="font-bold text-foreground">
-              {course.rating ? Number(course.rating).toFixed(1) : '5.0'}
-            </span>
-            <span>({Number(course.enrolledCount) || 0})</span>
+            {Number(course.reviewCount) > 0 && Number(course.rating) > 0 ? (
+              <>
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <span className="font-bold text-foreground">
+                  {Number(course.rating).toFixed(1)}
+                </span>
+                <span>({course.reviewCount})</span>
+              </>
+            ) : (
+              <span className="text-[11px] font-medium text-muted-foreground">
+                {Number(course.enrolledCount) > 0
+                  ? `${course.enrolledCount} ${Number(course.enrolledCount) === 1 ? 'enrolled' : 'enrolled'}`
+                  : 'New Program'}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-3">

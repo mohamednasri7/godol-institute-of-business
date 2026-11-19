@@ -56,24 +56,21 @@ const alumniReviews = [
     role: 'Market-Tested Curriculum',
     initials: 'PF',
     quote:
-      'Every concept taught inside our programs is grounded in practical case studies and modern market tools. You study real financial, management, and operational frameworks you can apply directly to your enterprise on day one.',
-    rating: 5
+      'Every concept taught inside our programs is grounded in practical case studies and modern market tools. You study real financial, management, and operational frameworks you can apply directly to your enterprise on day one.'
   },
   {
     name: 'Active Problem Solving',
     role: 'Collaborative & Project-Based',
     initials: 'AP',
     quote:
-      'We reject pure theoretical lectures. Our learning model combines structured self-study with live, scenario-based workshops where students break down real regional business challenges in collaborative sprints.',
-    rating: 5
+      'We reject pure theoretical lectures. Our learning model combines structured self-study with live, scenario-based workshops where students break down real regional business challenges in collaborative sprints.'
   },
   {
     name: 'Regional Relevance',
     role: 'Localized Strategy & Direct Feedback',
     initials: 'RR',
     quote:
-      'Global business principles adapted to local realities. Our programs connect learners with seasoned mentors who understand the regulatory, operational, and commercial landscape of Somalia and East Africa.',
-    rating: 5
+      'Global business principles adapted to local realities. Our programs connect learners with seasoned mentors who understand the regulatory, operational, and commercial landscape of Somalia and East Africa.'
   }
 ];
 
@@ -283,12 +280,9 @@ export default function About() {
                   border: '1px solid rgba(255,255,255,0.1)'
                 }}
               >
-                <div className="flex gap-1 mb-4">
-                  {Array(item.rating)
-                    .fill(0)
-                    .map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                    ))}
+                <div className="flex items-center gap-1.5 mb-4 text-xs font-bold text-amber-400 uppercase tracking-wider">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Academic Framework</span>
                 </div>
                 <p className="text-white/80 leading-relaxed flex-grow mb-5 italic text-sm">
                   "{item.quote}"

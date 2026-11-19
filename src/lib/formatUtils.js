@@ -40,3 +40,4 @@ export function formatTotalDuration(durationHours, totalDurationSeconds, fallbac
   if (h <= 0) return fallback;
   return `${h} ${h === 1 ? 'hour' : 'hours'}`;
 }
+

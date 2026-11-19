@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'wouter';
-import { Users, BookOpen, Star, ArrowLeft } from 'lucide-react';
+import { Users, BookOpen, Star, ArrowLeft, ShieldCheck } from 'lucide-react';
 import CourseCard from '../components/CourseCard';
 import { apiFetch } from '../lib/api';
 
@@ -98,15 +98,27 @@ export default function InstructorDetail() {
                   </div>
                 </div>
 
-                <div className="flex flex-col items-center md:items-start">
-                  <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">
-                    Rating
-                  </span>
-                  <div className="flex items-center gap-2 text-2xl font-bold text-foreground">
-                    <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                    {Number(instructor.rating || 5.0).toFixed(1)}
+                {Number(instructor.reviewCount) > 0 && Number(instructor.rating) > 0 ? (
+                  <div className="flex flex-col items-center md:items-start">
+                    <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">
+                      Rating
+                    </span>
+                    <div className="flex items-center gap-2 text-2xl font-bold text-foreground">
+                      <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+                      {Number(instructor.rating).toFixed(1)}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex flex-col items-center md:items-start">
+                    <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mb-1">
+                      Faculty Status
+                    </span>
+                    <div className="flex items-center gap-1.5 text-base font-bold text-emerald-600 mt-1">
+                      <ShieldCheck className="w-5 h-5" />
+                      <span>Verified Academic</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="prose max-w-3xl">

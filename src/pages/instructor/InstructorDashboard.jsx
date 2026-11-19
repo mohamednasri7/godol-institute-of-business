@@ -1067,7 +1067,7 @@ export default function InstructorDashboard() {
                     <div className="text-2xl font-bold font-serif text-gray-900">
                       {myArticles.reduce((sum, a) => sum + (a.metrics?.likes || 0), 0)}
                     </div>
-                    <div className="text-[10px] text-gray-500 mt-0.5">Positive reader rating</div>
+                    <div className="text-[10px] text-gray-500 mt-0.5">Verified reader feedback</div>
                   </div>
 
                   <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">

@@ -28,19 +28,23 @@ export default function InstructorCard({ instructor }) {
       </p>
 
       <div className="flex items-center justify-center gap-4 text-xs font-medium mt-auto pt-3 border-t border-border w-full">
-        <div className="flex items-center gap-1.5 text-foreground">
-          <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-          <span className="font-semibold">{instructor.rating ? Number(instructor.rating).toFixed(1) : '5.0'}</span>
-        </div>
-        <div className="w-1 h-1 rounded-full bg-border" />
+        {Number(instructor.reviewCount) > 0 && Number(instructor.rating) > 0 ? (
+          <>
+            <div className="flex items-center gap-1.5 text-foreground">
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              <span className="font-semibold">{Number(instructor.rating).toFixed(1)}</span>
+            </div>
+            <div className="w-1 h-1 rounded-full bg-border" />
+          </>
+        ) : null}
         <div className="flex items-center gap-1 text-muted-foreground">
           <Users className="w-3.5 h-3.5" />
-          <span>{(instructor.studentCount ?? 0).toLocaleString()} students</span>
+          <span>{Number(instructor.studentCount || 0).toLocaleString()} {Number(instructor.studentCount) === 1 ? 'student' : 'students'}</span>
         </div>
         <div className="w-1 h-1 rounded-full bg-border" />
         <div className="flex items-center gap-1 text-muted-foreground">
           <BookOpen className="w-3.5 h-3.5" />
-          <span>{instructor.courseCount ?? 0} courses</span>
+          <span>{Number(instructor.courseCount || 0)} {Number(instructor.courseCount) === 1 ? 'course' : 'courses'}</span>
         </div>
       </div>
     </Link>

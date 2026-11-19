@@ -454,18 +454,18 @@ export default function AdminDashboard() {
 
         {/* Metric Cards Row 1 with trend comparison */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          <StatCard label="Verified Revenue" value={fmtUSD(stats?.verifiedRevenue)} sub="vs last mo." trend="+18.4%" icon={DollarSign} color="bg-emerald-600" linkTo="/admin/revenue" />
-          <StatCard label="Revenue This Month" value={fmtUSD(stats?.revenueThisMonth)} sub="vs last mo." trend="+12.2%" icon={TrendingUp} color="bg-blue-600" linkTo="/admin/revenue" />
-          <StatCard label="Total Students" value={fmt(stats?.totalStudents)} sub="vs last mo." trend="+9.6%" icon={Users} color="bg-indigo-600" linkTo="/admin/students" />
+          <StatCard label="Verified Revenue" value={fmtUSD(stats?.verifiedRevenue)} sub="All-time verified" icon={DollarSign} color="bg-emerald-600" linkTo="/admin/revenue" />
+          <StatCard label="Revenue This Month" value={fmtUSD(stats?.revenueThisMonth)} sub="Current billing cycle" icon={TrendingUp} color="bg-blue-600" linkTo="/admin/revenue" />
+          <StatCard label="Total Students" value={fmt(stats?.totalStudents)} sub="Registered profiles" icon={Users} color="bg-indigo-600" linkTo="/admin/students" />
           <StatCard label="Pending Verification" value={fmt(stats?.pendingVerification)} sub={stats?.pendingVerification > 0 ? "Action needed" : "Up to date"} trend={stats?.pendingVerification > 0 ? "Review" : "Clear"} icon={AlertCircle} color="bg-amber-500" linkTo="/admin/payments" />
         </div>
 
         {/* Metric Cards Row 2 with trend comparison */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-          <StatCard label="Total Courses" value={fmt(stats?.totalCourses)} sub={`${fmt(stats?.publishedCourses)} published`} trend="+2 new" icon={BookOpen} color="bg-purple-600" linkTo="/admin/courses" />
-          <StatCard label="Active Enrollments" value={fmt(stats?.activeEnrollments)} sub="vs last mo." trend="+14.1%" icon={ClipboardList} color="bg-cyan-600" linkTo="/admin/enrollments" />
-          <StatCard label="Total Instructors" value={fmt(stats?.totalInstructors)} sub="Faculty active" trend="Verified" icon={Users} color="bg-pink-600" linkTo="/admin/instructors" />
-          <StatCard label="Site-Wide Blog Views" value={fmt(siteWideBlogViews)} sub={`${fmt(posts.length)} articles`} trend="+24.5%" icon={FileText} color="bg-blue-700" linkTo="/admin/blog" />
+          <StatCard label="Total Courses" value={fmt(stats?.totalCourses)} sub={`${fmt(stats?.publishedCourses)} published`} icon={BookOpen} color="bg-purple-600" linkTo="/admin/courses" />
+          <StatCard label="Active Enrollments" value={fmt(stats?.activeEnrollments)} sub="Access granted" icon={ClipboardList} color="bg-cyan-600" linkTo="/admin/enrollments" />
+          <StatCard label="Total Instructors" value={fmt(stats?.totalInstructors)} sub="Faculty active" icon={Users} color="bg-pink-600" linkTo="/admin/instructors" />
+          <StatCard label="Site-Wide Blog Views" value={fmt(siteWideBlogViews)} sub={`${fmt(posts.length)} articles`} icon={FileText} color="bg-blue-700" linkTo="/admin/blog" />
         </div>
 
         {/* Performance & Growth Analytics Charts */}

@@ -505,7 +505,8 @@ export async function pullFromSupabase() {
         totalStudents: db.students?.length || 0,
         totalCourses: db.courses?.length || 0,
         totalInstructors: db.instructors?.length || 0,
-        avgRating: 5.0
+        totalEnrollments: (db.enrollments || []).filter(e => e.accessGranted || e.enrollmentStatus === 'approved').length,
+        avgRating: null
       };
       memoryDB = db;
       try {
@@ -689,13 +690,50 @@ export function enrichCourseWithDynamicStats(course, db) {
          (e.accessGranted === true || e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed')
   ).length;
 
+  // 5. Real reviews & rating (null if no real reviews submitted)
+  const reviewCount = Number(course.reviewCount) || 0;
+  const rating = reviewCount > 0 && course.rating ? Number(course.rating) : null;
+
   return {
     ...course,
     moduleCount,
     lessonCount,
     durationHours,
     durationSeconds: totalDurationSeconds,
-    enrolledCount: enrolledCount > 0 ? enrolledCount : (Number(course.enrolledCount) || 0)
+    enrolledCount: enrolledCount > 0 ? enrolledCount : (Number(course.enrolledCount) || 0),
+    rating,
+    reviewCount
+  };
+}
+
+// Dynamic Instructor Stats Calculation (Courses, Students, Ratings)
+export function enrichInstructorWithDynamicStats(instructor, db) {
+  if (!instructor) return instructor;
+  const instId = Number(instructor.id);
+
+  // 1. Get courses taught by this instructor
+  const assignedCourses = (db.courses || []).filter(
+    c => Number(c.instructorId || c.instructor_id) === instId
+  );
+  const courseCount = assignedCourses.length;
+  const courseIds = assignedCourses.map(c => Number(c.id));
+
+  // 2. Real enrolled students across this instructor's courses
+  const studentCount = (db.enrollments || []).filter(
+    e => courseIds.includes(Number(e.courseId || e.course_id)) &&
+         (e.accessGranted === true || e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed')
+  ).length;
+
+  // 3. Real reviews / rating (null if no reviews submitted)
+  const reviewCount = Number(instructor.reviewCount) || 0;
+  const rating = reviewCount > 0 && instructor.rating ? Number(instructor.rating) : null;
+
+  return {
+    ...instructor,
+    courseCount,
+    studentCount,
+    rating,
+    reviewCount
   };
 }
 
@@ -1318,7 +1356,8 @@ export function createApiRouter() {
   // Instructors
   router.get('/instructors', (req, res) => {
     const db = loadDB();
-    res.json(db.instructors);
+    const list = (db.instructors || []).map(inst => enrichInstructorWithDynamicStats(inst, db));
+    res.json(list);
   });
 
   router.get('/instructors/:id', (req, res) => {
@@ -1326,8 +1365,11 @@ export function createApiRouter() {
     const id = Number(req.params.id);
     const instructor = db.instructors.find(i => i.id === id);
     if (!instructor) return res.status(404).json({ error: 'Instructor not found' });
-    const courses = db.courses.filter(c => c.instructorId === id);
-    res.json({ ...instructor, courses });
+    const enriched = enrichInstructorWithDynamicStats(instructor, db);
+    const courses = (db.courses || [])
+      .filter(c => Number(c.instructorId || c.instructor_id) === id)
+      .map(c => enrichCourseWithDynamicStats(c, db));
+    res.json({ ...enriched, courses });
   });
 
   // Workshops
@@ -1642,7 +1684,17 @@ export function createApiRouter() {
   // Stats
   router.get('/stats', (req, res) => {
     const db = loadDB();
-    res.json(db.stats);
+    const totalStudents = db.students?.length || 0;
+    const totalCourses = (db.courses || []).filter(c => c.status === 'published' || c.approvalStatus === 'approved').length;
+    const totalInstructors = db.instructors?.length || 0;
+    const totalEnrollments = (db.enrollments || []).filter(e => e.accessGranted || e.enrollmentStatus === 'approved').length;
+    res.json({
+      totalStudents,
+      totalCourses,
+      totalInstructors,
+      totalEnrollments,
+      avgRating: null
+    });
   });
 
   // ─────────── STUDENT AUTH & REGISTRATION ───────────
@@ -2367,7 +2419,8 @@ export function createApiRouter() {
       durationHours: Number(req.body.durationHours || 0),
       lessonCount: Number(req.body.lessonCount || 0),
       enrolledCount: Number(req.body.enrolledCount || 0),
-      rating: Number(req.body.rating || 5.0),
+      rating: req.body.rating ? Number(req.body.rating) : null,
+      reviewCount: Number(req.body.reviewCount || 0),
       featured: Boolean(req.body.featured),
       badge: req.body.badge || (req.body.featured ? 'Featured' : null),
       thumbnail: req.body.thumbnail || '/course-business.png',
@@ -2887,11 +2940,16 @@ export function createApiRouter() {
       const revenue = db.payments.filter(p =>
         p.status === 'verified' && courses.some(c => c.id === p.courseId)
       ).reduce((s, p) => s + Number(p.verifiedAmount || 0), 0);
+      const reviewCount = Number(inst.reviewCount) || 0;
+      const rating = reviewCount > 0 && inst.rating ? Number(inst.rating) : null;
       return {
         ...inst,
         status: inst.status || 'verified',
         courseCount: courses.length,
+        studentCount: enrollmentCount,
         enrollmentCount,
+        rating,
+        reviewCount,
         revenue,
         assignedCourses: courses.map(c => ({ id: c.id, title: c.title, price: c.price, level: c.level }))
       };
@@ -2905,10 +2963,10 @@ export function createApiRouter() {
       ...req.body,
       id: nextId(db.instructors),
       status: req.body.status || 'verified',
-      rating: req.body.rating || 4.9,
-      reviewCount: req.body.reviewCount || 50,
-      studentCount: req.body.studentCount || 100,
-      courseCount: req.body.courseCount || 0,
+      rating: req.body.rating ? Number(req.body.rating) : null,
+      reviewCount: Number(req.body.reviewCount || 0),
+      studentCount: 0,
+      courseCount: 0,
       joinedAt: new Date().toISOString(),
       verifiedAt: new Date().toISOString(),
       verifiedBy: 'admin@godolinstitute.so'
@@ -2986,7 +3044,8 @@ export function createApiRouter() {
       status: req.body.status || 'published',
       approvalStatus: 'approved',
       enrolledCount: 0,
-      rating: 5.0,
+      rating: null,
+      reviewCount: 0,
       whatYouLearn: Array.isArray(req.body.whatYouLearn) ? req.body.whatYouLearn : [],
       requirements: Array.isArray(req.body.requirements) ? req.body.requirements : [],
       sections: Array.isArray(req.body.sections) ? req.body.sections : [],
@@ -3106,9 +3165,9 @@ export function createApiRouter() {
         email: email || app.email,
         phone: phone || app.phone,
         password: password || 'godol2026',
-        rating: Number(rating) || 4.9,
-        reviewCount: 20,
-        studentCount: 50,
+        rating: rating ? Number(rating) : null,
+        reviewCount: 0,
+        studentCount: 0,
         courseCount: 0,
         status: 'verified',
         joinedAt: new Date().toISOString(),
@@ -3158,7 +3217,7 @@ export function createApiRouter() {
         phone: instructor.phone,
         avatar: instructor.avatar,
         bio: instructor.bio,
-        rating: instructor.rating || 4.9,
+        rating: instructor.rating ? Number(instructor.rating) : null,
         courseCount: assignedCourses.length
       }
     });
@@ -3203,7 +3262,7 @@ export function createApiRouter() {
         phone: instructor.phone,
         avatar: instructor.avatar,
         bio: instructor.bio,
-        rating: instructor.rating || 4.9
+        rating: instructor.rating ? Number(instructor.rating) : null
       },
       stats: {
         totalCourses: myCourses.length,

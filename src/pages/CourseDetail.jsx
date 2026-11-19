@@ -3,7 +3,7 @@ import { useLocation, useParams, Link } from 'wouter';
 import {
   Star, Clock, BookOpen, CheckCircle, PlayCircle, Lock,
   Share2, Award, ChevronDown, ChevronUp, X, ShieldCheck,
-  AlertCircle, CreditCard, Play, ArrowRight, Sparkles
+  AlertCircle, CreditCard, Play, ArrowRight, Sparkles, Users
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { auth } from '../lib/auth';
@@ -334,12 +334,20 @@ export default function CourseDetail() {
             </p>
 
             <div className="flex flex-wrap items-center gap-6 text-sm text-white/80">
+              {Number(course.reviewCount) > 0 && Number(course.rating) > 0 ? (
+                <div className="flex items-center gap-1.5">
+                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <span className="font-bold">{Number(course.rating).toFixed(1)}</span>
+                  <span className="text-white/50">({course.reviewCount} {course.reviewCount === 1 ? 'review' : 'reviews'})</span>
+                </div>
+              ) : null}
               <div className="flex items-center gap-1.5">
-                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                <span className="font-bold">
-                  {course.rating ? Number(course.rating).toFixed(1) : '5.0'}
+                <Users className="w-4 h-4 text-white/60" />
+                <span>
+                  {realEnrolledCount > 0
+                    ? `${realEnrolledCount} ${realEnrolledCount === 1 ? 'enrolled' : 'enrolled'}`
+                    : 'Open Enrollment'}
                 </span>
-                <span className="text-white/50">({realEnrolledCount} {realEnrolledCount === 1 ? 'enrolled' : 'enrolled'})</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-white/60" />

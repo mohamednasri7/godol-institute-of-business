@@ -209,7 +209,7 @@ export default function DashboardCharts({ payments = [], enrollments = [], cours
           </div>
           <div className="flex items-center justify-between text-xs text-gray-500 dark:text-muted-foreground pt-2 border-t border-gray-100 dark:border-border">
             <span>Verified Net Volume: <strong className="text-gray-900 dark:text-foreground font-mono">${revenueTrendData.reduce((s, p) => s + p.amount, 0).toLocaleString()}</strong></span>
-            <span className="text-emerald-600 font-semibold flex items-center gap-1">↑ 14.8% vs prior window</span>
+            <span className="text-emerald-600 font-semibold flex items-center gap-1">Live verified records</span>
           </div>
         </div>
       )}

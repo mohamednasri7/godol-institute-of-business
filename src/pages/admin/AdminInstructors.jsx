@@ -18,10 +18,10 @@ const defaultInst = {
   email: '',
   phone: '',
   password: 'godol2026',
-  rating: 4.9,
-  reviewCount: 50,
-  studentCount: 150,
-  courseCount: 1,
+  rating: null,
+  reviewCount: 0,
+  studentCount: 0,
+  courseCount: 0,
   avatar: '/instructor-1.png',
   status: 'verified'
 };
@@ -70,7 +70,7 @@ export default function AdminInstructors() {
     email: '',
     password: 'godol2026',
     title: 'Senior Faculty Instructor',
-    rating: 4.9
+    rating: null
   });
 
   // UI state
@@ -261,7 +261,7 @@ export default function AdminInstructors() {
       email: app.email || `${clean}@godolinstitute.so`,
       password: `godol${Math.floor(1000 + Math.random() * 9000)}`,
       title: app.title || 'Executive Instructor',
-      rating: 4.9,
+      rating: null,
       phone: app.phone || ''
     });
   };
@@ -603,8 +603,12 @@ export default function AdminInstructors() {
                         <h4 className="font-bold text-base text-gray-900 truncate">{inst.name}</h4>
                         <p className="text-xs text-primary font-medium truncate">{inst.title}</p>
                         <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-500">
-                          <span>★ {inst.rating || 4.9}</span>
-                          <span>•</span>
+                          {Number(inst.reviewCount) > 0 && Number(inst.rating) > 0 && (
+                            <>
+                              <span>★ {Number(inst.rating).toFixed(1)}</span>
+                              <span>•</span>
+                            </>
+                          )}
                           <span>👥 {inst.studentCount || 0} students</span>
                         </div>
                       </div>
