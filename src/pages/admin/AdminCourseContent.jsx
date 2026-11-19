@@ -30,6 +30,7 @@ import {
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
 import { bunnyService } from '../../lib/bunnyService';
+import * as tus from 'tus-js-client';
 
 const DEFAULT_LIBRARY_ID = import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '342890';
 
@@ -369,7 +370,7 @@ export default function AdminCourseContent() {
     }
   };
 
-  // TAB 1: Bunny Stream Video Upload & ID Assignment
+  // TAB 1: Bunny Stream Video Upload via TUS resumable protocol
   const handleProcessVideoFile = async (file) => {
     if (!file || !activeLesson) return;
     const validExts = ['.mp4', '.mov', '.mkv', '.webm'];
@@ -384,31 +385,75 @@ export default function AdminCourseContent() {
     setVideoUploadProgress({ percent: 0, loaded: 0, total: file.size });
 
     try {
-      const result = await bunnyService.uploadVideo(
-        file,
-        {
+      // 1. Get TUS credentials from server (creates video object + signs)
+      const creds = await apiFetch('/api/bunny/stream/sign-tus', {
+        method: 'POST',
+        body: JSON.stringify({
           title: `${selectedCourse?.title || 'Course'} - ${activeLesson.title}`,
           lessonId: activeLesson.id
-        },
-        (progress) => {
-          setVideoUploadProgress(progress);
-        }
-      );
-
-      const newVideoId = result.videoId;
-      setCustomBunnyVideoId(newVideoId);
-      setVideoStatus('ready');
-
-      await handleUpdateLessonField({
-        bunnyVideoId: newVideoId,
-        videoLibraryId: result.libraryId || DEFAULT_LIBRARY_ID,
-        videoStatus: 'ready'
+        })
       });
 
-      showToast('Video uploaded and transcoded to Bunny Stream!');
+      // 2. Simulated mode (no API key configured yet)
+      if (creds.mode === 'simulated') {
+        setCustomBunnyVideoId(creds.videoId);
+        setVideoStatus('ready');
+        await handleUpdateLessonField({
+          bunnyVideoId: creds.videoId,
+          videoLibraryId: creds.libraryId,
+          videoStatus: 'ready'
+        });
+        showToast('Video linked (simulated — add BUNNY_STREAM_API_KEY to go live)');
+        return;
+      }
+
+      // 3. Direct browser → Bunny TUS resumable upload (bypasses server body limits, supports 1GB+)
+      await new Promise((resolve, reject) => {
+        const upload = new tus.Upload(file, {
+          endpoint: 'https://video.bunnycdn.com/tusupload',
+          retryDelays: [0, 3000, 5000, 10000, 20000],
+          chunkSize: 5 * 1024 * 1024, // 5 MB chunks
+          metadata: {
+            filetype: file.type,
+            title: `${selectedCourse?.title || 'Course'} - ${activeLesson.title}`,
+            filename: file.name
+          },
+          headers: {
+            AuthorizationSignature: creds.authSignature,
+            AuthorizationExpire: String(creds.authExpire),
+            VideoId: creds.videoId,
+            LibraryId: String(creds.libraryId)
+          },
+          onProgress(bytesUploaded, bytesTotal) {
+            const percent = Math.round((bytesUploaded / bytesTotal) * 100);
+            setVideoUploadProgress({ percent, loaded: bytesUploaded, total: bytesTotal });
+          },
+          onSuccess() {
+            resolve();
+          },
+          onError(err) {
+            reject(err);
+          }
+        });
+        upload.start();
+      });
+
+      // 4. Upload finished — Bunny transcodes async; mark as processing
+      setCustomBunnyVideoId(creds.videoId);
+      setVideoStatus('processing');
+      await handleUpdateLessonField({
+        bunnyVideoId: creds.videoId,
+        videoLibraryId: creds.libraryId,
+        videoStatus: 'processing'
+      });
+      showToast('Video uploaded to Bunny Stream — transcoding in progress!');
+
+      // After a short delay, optimistically mark ready
+      setTimeout(() => setVideoStatus('ready'), 4000);
+
     } catch (err) {
       setVideoStatus('pending');
-      showToast('Video upload error: ' + err.message, 'error');
+      showToast('TUS upload error: ' + (err?.message || String(err)), 'error');
     } finally {
       setIsUploadingVideo(false);
     }
@@ -526,11 +571,10 @@ export default function AdminCourseContent() {
         {/* Toast alert */}
         {toast && (
           <div
-            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 animate-fadeIn border ${
-              toast.type === 'error'
+            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 animate-fadeIn border ${toast.type === 'error'
                 ? 'bg-rose-950/90 text-rose-200 border-rose-500/50'
                 : 'bg-slate-900/90 text-white border-white/20'
-            }`}
+              }`}
           >
             {toast.type === 'error' ? <AlertCircle className="w-4 h-4 text-rose-400" /> : <CheckCircle className="w-4 h-4 text-emerald-400" />}
             <span>{toast.msg}</span>
@@ -593,11 +637,10 @@ export default function AdminCourseContent() {
               <>
                 <button
                   onClick={handleTogglePublish}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    selectedCourse.status === 'published'
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedCourse.status === 'published'
                       ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
                       : 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
-                  }`}
+                    }`}
                 >
                   {selectedCourse.status === 'published' ? 'Status: Published ✓' : 'Status: Draft'}
                 </button>
@@ -775,17 +818,15 @@ export default function AdminCourseContent() {
                           <div
                             key={lesson.id || lIdx}
                             onClick={() => openLessonDrawer(lesson, mod)}
-                            className={`p-3.5 rounded-xl flex items-center justify-between text-xs transition-all cursor-pointer border ${
-                              isSelected
+                            className={`p-3.5 rounded-xl flex items-center justify-between text-xs transition-all cursor-pointer border ${isSelected
                                 ? 'bg-primary/10 border-primary shadow-sm'
                                 : 'bg-card/70 hover:bg-card border-border/60 hover:border-primary/40'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
                               <div
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                                  hasVideo ? 'bg-emerald-500/15 text-emerald-600' : 'bg-muted text-muted-foreground'
-                                }`}
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${hasVideo ? 'bg-emerald-500/15 text-emerald-600' : 'bg-muted text-muted-foreground'
+                                  }`}
                               >
                                 {hasVideo ? <Film className="w-4 h-4" /> : <Video className="w-4 h-4" />}
                               </div>
@@ -978,22 +1019,20 @@ export default function AdminCourseContent() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setDrawerTab('video')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
-                    drawerTab === 'video'
+                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${drawerTab === 'video'
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
+                    }`}
                 >
                   <Video className="w-4 h-4" />
                   <span>Tab 1: Video Streaming (Bunny Stream)</span>
                 </button>
                 <button
                   onClick={() => setDrawerTab('resources')}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
-                    drawerTab === 'resources'
+                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${drawerTab === 'resources'
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
+                    }`}
                 >
                   <FileText className="w-4 h-4" />
                   <span>Tab 2: Downloadable Resources ({activeResources.length})</span>
@@ -1036,6 +1075,11 @@ export default function AdminCourseContent() {
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                           <span>Uploading ({videoUploadProgress?.percent || 0}%)</span>
                         </span>
+                      ) : videoStatus === 'processing' ? (
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/15 text-blue-600 border border-blue-500/30 flex items-center gap-1.5 animate-pulse">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Transcoding on Bunny Stream…</span>
+                        </span>
                       ) : activeVideoId ? (
                         <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 flex items-center gap-1.5">
                           <CheckCircle className="w-3.5 h-3.5" />
@@ -1063,11 +1107,10 @@ export default function AdminCourseContent() {
                       if (file) handleProcessVideoFile(file);
                     }}
                     onClick={() => videoInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer ${
-                      videoDragOver
+                    className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer ${videoDragOver
                         ? 'border-primary bg-primary/10 scale-[1.01]'
                         : 'border-border hover:border-primary/50 bg-card/40 hover:bg-card'
-                    }`}
+                      }`}
                   >
                     <input
                       ref={videoInputRef}
@@ -1198,11 +1241,10 @@ export default function AdminCourseContent() {
                       if (e.dataTransfer.files) handleProcessResourceFiles(e.dataTransfer.files);
                     }}
                     onClick={() => resourceInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer ${
-                      resourceDragOver
+                    className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer ${resourceDragOver
                         ? 'border-blue-500 bg-blue-500/10 scale-[1.01]'
                         : 'border-border hover:border-blue-500/50 bg-card/40 hover:bg-card'
-                    }`}
+                      }`}
                   >
                     <input
                       ref={resourceInputRef}

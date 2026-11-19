@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +32,95 @@ export function createBunnyRouter(dbCtx = {}) {
       isConfigured: Boolean(BUNNY_STREAM_API_KEY && BUNNY_STREAM_LIBRARY_ID),
       isStorageConfigured: Boolean(BUNNY_STORAGE_API_KEY && BUNNY_STORAGE_ZONE_NAME)
     });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // POST /api/bunny/stream/sign-tus
+  // Server-side TUS signature for direct browser → Bunny Stream resumable upload
+  // Flow:
+  //   1. Creates a video object in Bunny Stream → gets videoId (guid)
+  //   2. Computes SHA256 signature: sha256(libraryId + apiKey + expiration + videoId)
+  //   3. Returns videoId, libraryId, AuthorizationSignature, AuthorizationExpire
+  //      so the browser can upload directly to https://video.bunnycdn.com/tusupload
+  // ─────────────────────────────────────────────────────────────────────────
+  router.post('/stream/sign-tus', async (req, res) => {
+    try {
+      const { title, lessonId } = req.body;
+      const videoTitle = title || `Lesson Video - ${Date.now()}`;
+
+      let videoId;
+      let libraryId = BUNNY_STREAM_LIBRARY_ID;
+
+      if (!BUNNY_STREAM_API_KEY) {
+        // No API key: return a mock token so the UI stays functional in dev
+        const mockId = `mock_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        return res.json({
+          success: true,
+          videoId: mockId,
+          libraryId,
+          authSignature: 'mock_signature',
+          authExpire: Math.floor(Date.now() / 1000) + 3600,
+          embedUrl: `https://iframe.mediadelivery.net/embed/${libraryId}/${mockId}?autoplay=false&loop=false&muted=false&preload=true&responsive=true`,
+          mode: 'simulated'
+        });
+      }
+
+      // 1. Create video record in Bunny Stream
+      const createRes = await fetch(
+        `https://video.bunnycdn.com/library/${libraryId}/videos`,
+        {
+          method: 'POST',
+          headers: {
+            'AccessKey': BUNNY_STREAM_API_KEY,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ title: videoTitle })
+        }
+      );
+
+      if (!createRes.ok) {
+        const errText = await createRes.text();
+        throw new Error(`Bunny Stream video creation failed: ${createRes.status} — ${errText}`);
+      }
+
+      const createData = await createRes.json();
+      videoId = createData.guid;
+
+      // 2. Compute SHA256 signature
+      //    Formula: SHA256(libraryId + apiKey + expirationTime + videoId)
+      //    Expiry: 6 hours from now
+      const expiration = Math.floor(Date.now() / 1000) + 21600; // 6 hours
+      const rawSignature = `${libraryId}${BUNNY_STREAM_API_KEY}${expiration}${videoId}`;
+      const signature = createHash('sha256').update(rawSignature).digest('hex');
+
+      // 3. Optionally associate with lesson in DB (mark as uploading)
+      if (lessonId && loadDB && saveDB) {
+        const db = loadDB();
+        const lesson = (db.course_lessons || []).find(l => l.id === Number(lessonId));
+        if (lesson) {
+          lesson.bunnyVideoId = videoId;
+          lesson.videoLibraryId = libraryId;
+          lesson.videoStatus = 'uploading';
+          saveDB(db);
+          if (isSupabaseConfigured && syncRecordToSupabase) {
+            syncRecordToSupabase('course_lessons', lesson).catch(() => {});
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        videoId,
+        libraryId,
+        authSignature: signature,
+        authExpire: expiration,
+        embedUrl: `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?autoplay=false&loop=false&muted=false&preload=true&responsive=true`
+      });
+    } catch (err) {
+      console.error('TUS sign error:', err);
+      res.status(500).json({ error: err.message || 'Failed to generate TUS upload credentials' });
+    }
   });
 
   // Handler for creating video entry on Bunny Stream API
