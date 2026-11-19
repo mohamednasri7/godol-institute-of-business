@@ -396,11 +396,10 @@ export default function AdminDashboard() {
         {/* Refresh Header, Global Search & Realtime Sync Indicator */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
-              isRealtimeActive
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${isRealtimeActive
                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                 : 'bg-gray-100 text-gray-500'
-            }`}>
+              }`}>
               <span className={`w-2 h-2 rounded-full ${isRealtimeActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`}></span>
               <span>{isRealtimeActive ? 'Realtime Live Sync Active' : 'Polling Sync'}</span>
             </span>
@@ -642,11 +641,10 @@ export default function AdminDashboard() {
                 <button
                   key={tab.id}
                   onClick={() => setBlogStatusFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg transition-all ${
-                    blogStatusFilter === tab.id
+                  className={`px-3 py-1.5 rounded-lg transition-all ${blogStatusFilter === tab.id
                       ? 'bg-white text-gray-900 shadow-sm font-bold'
                       : 'text-gray-500 hover:text-gray-900'
-                  }`}
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -737,9 +735,8 @@ export default function AdminDashboard() {
                         <td className="py-4 px-4">
                           <div>
                             <p className="font-semibold text-gray-900">{post.authorName || post.author || 'Godol Editorial'}</p>
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold mt-0.5 ${
-                              isInstructor ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-purple-50 text-purple-700 border border-purple-200'
-                            }`}>
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold mt-0.5 ${isInstructor ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-purple-50 text-purple-700 border border-purple-200'
+                              }`}>
                               {isInstructor ? 'Faculty Instructor' : 'Admin / Editorial'}
                             </span>
                           </div>
@@ -755,11 +752,10 @@ export default function AdminDashboard() {
                           <button
                             onClick={() => handleTogglePostStatus(post)}
                             title="Click to toggle Published vs Draft"
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border ${
-                              isPub
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all border ${isPub
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                                 : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
-                            }`}
+                              }`}
                           >
                             {isPub ? (
                               <>

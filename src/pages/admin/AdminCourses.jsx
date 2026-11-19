@@ -118,12 +118,18 @@ export default function AdminCourses() {
       if (editingCourse) {
         await apiFetch(`/api/admin/courses/${editingCourse.id}`, { method: 'PUT', body: JSON.stringify(payload) });
         showToast('Course updated successfully.');
+        setShowModal(false);
+        fetchCourses();
       } else {
-        await apiFetch('/api/admin/courses', { method: 'POST', body: JSON.stringify(payload) });
-        showToast('Course created and published live on website!');
+        const created = await apiFetch('/api/admin/courses', { method: 'POST', body: JSON.stringify(payload) });
+        showToast('Course created! Redirecting to Curriculum & Media Manager...');
+        setShowModal(false);
+        if (created?.id) {
+          window.location.href = `/admin/course-content?courseId=${created.id}`;
+          return;
+        }
+        fetchCourses();
       }
-      setShowModal(false);
-      fetchCourses();
     } catch (err) { showToast(err.message, 'error'); }
   };
 
@@ -276,6 +282,13 @@ export default function AdminCourses() {
                             <button onClick={() => handleReject(c)} className="px-2.5 py-1.5 bg-red-500 text-white rounded-lg text-[11px] font-bold hover:bg-red-600">Reject</button>
                           </>
                         )}
+                        <a
+                          href={`/admin/course-content?courseId=${c.id}`}
+                          className="p-1.5 text-blue-600 hover:text-blue-700 rounded-lg hover:bg-blue-50 transition-colors"
+                          title="Manage Curriculum & Bunny.net Media"
+                        >
+                          <BookOpen className="w-4 h-4" />
+                        </a>
                         <a
                           href={`/courses/${c.slug || c.id}/learn`}
                           target="_blank"

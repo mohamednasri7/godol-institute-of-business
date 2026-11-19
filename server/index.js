@@ -79,6 +79,7 @@ function loadDB() {
     // Ensure course curriculum, enrollments, progress, notes, and discussions exist
     if (!data.course_modules) data.course_modules = [];
     if (!data.course_lessons) data.course_lessons = [];
+    if (!data.lesson_resources) data.lesson_resources = [];
     if (!data.course_enrollments) data.course_enrollments = [];
     if (!data.lesson_progress) data.lesson_progress = [];
     if (!data.lesson_notes) data.lesson_notes = [];
@@ -97,7 +98,7 @@ function loadDB() {
       }
 
       const existingModules = data.course_modules.filter(m => (m.courseId === c.id || m.course_id === c.id));
-      if (existingModules.length === 0) {
+      if (existingModules.length === 0 && c.id === 1 && data.courses.length <= 1) {
         const mod1 = {
           id: data.course_modules.length + 1,
           courseId: c.id,
@@ -202,7 +203,8 @@ const TABLE_COLUMNS = {
   instructors: ['id', 'name', 'title', 'bio', 'avatar', 'email', 'phone', 'rating', 'review_count', 'student_count', 'course_count', 'status', 'joined_at'],
   courses: ['id', 'title', 'slug', 'description', 'price', 'level', 'duration_hours', 'lesson_count', 'enrolled_count', 'rating', 'featured', 'badge', 'thumbnail', 'instructor_id', 'instructor_name', 'category_id', 'category_name', 'status', 'approval_status', 'what_you_learn', 'requirements', 'sections', 'created_at'],
   course_modules: ['id', 'course_id', 'title', 'sort_order', 'created_at'],
-  course_lessons: ['id', 'module_id', 'course_id', 'title', 'description', 'bunny_video_id', 'bunny_library_id', 'duration_seconds', 'resource_urls', 'is_free_preview', 'sort_order', 'created_at'],
+  course_lessons: ['id', 'module_id', 'course_id', 'title', 'description', 'bunny_video_id', 'bunny_library_id', 'video_library_id', 'video_status', 'duration_seconds', 'resource_urls', 'is_free_preview', 'sort_order', 'created_at'],
+  lesson_resources: ['id', 'lesson_id', 'course_id', 'title', 'file_type', 'file_size_bytes', 'bunny_storage_path', 'file_url', 'created_at'],
   course_enrollments: ['id', 'user_id', 'course_id', 'enrolled_at', 'completed_at', 'last_accessed_lesson_id', 'created_at'],
   lesson_progress: ['id', 'user_id', 'course_id', 'lesson_id', 'is_completed', 'watched_seconds', 'updated_at'],
   lesson_notes: ['id', 'user_id', 'lesson_id', 'video_timestamp_seconds', 'content', 'created_at'],
@@ -283,6 +285,7 @@ const LOCAL_TO_SUPABASE = {
   notifications: 'notifications',
   course_modules: 'course_modules',
   course_lessons: 'course_lessons',
+  lesson_resources: 'lesson_resources',
   course_enrollments: 'course_enrollments',
   lesson_progress: 'lesson_progress',
   lesson_notes: 'lesson_notes',
@@ -767,7 +770,7 @@ export function createApiRouter() {
   router.use(express.json({ limit: '25mb' }));
 
   // Bunny.net Stream & Storage CDN Router
-  router.use('/bunny', createBunnyRouter());
+  router.use('/bunny', createBunnyRouter({ loadDB, saveDB, supabase, isSupabaseConfigured, syncRecordToSupabase }));
 
   // Auto-sync middleware: for any GET request, if it's been > 800ms since last sync or requested with fresh/timestamp,
   // pull latest changes from Supabase so the dashboard and website always show the newest data immediately
@@ -918,7 +921,7 @@ export function createApiRouter() {
 
   // ─────────── INTERACTIVE COURSE CURRICULUM & LEARNING PLAYER ───────────
 
-  // Get full structured curriculum (modules + lessons) for a course
+  // Get full structured curriculum (modules + lessons + resources) for a course
   router.get('/courses/:id/curriculum', (req, res) => {
     const db = loadDB();
     const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
@@ -930,7 +933,17 @@ export function createApiRouter() {
       .map(mod => {
         const lessons = (db.course_lessons || [])
           .filter(l => (l.moduleId === mod.id || l.module_id === mod.id))
-          .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1));
+          .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
+          .map(l => {
+            const lessonResources = (db.lesson_resources || []).filter(r => (r.lessonId === l.id || r.lesson_id === l.id));
+            return {
+              ...l,
+              bunnyVideoId: l.bunnyVideoId || l.bunny_video_id || '',
+              videoLibraryId: l.videoLibraryId || l.video_library_id || l.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+              videoStatus: l.videoStatus || l.video_status || (l.bunnyVideoId || l.bunny_video_id ? 'ready' : 'pending'),
+              resources: lessonResources
+            };
+          });
         return {
           ...mod,
           lessons
@@ -941,6 +954,28 @@ export function createApiRouter() {
       course: enrichCourseWithDynamicStats(course, db),
       modules
     });
+  });
+
+  // Get resources for a lesson
+  router.get('/lessons/:lessonId/resources', (req, res) => {
+    const db = loadDB();
+    const lessonId = Number(req.params.lessonId);
+    const resources = (db.lesson_resources || []).filter(r => (r.lessonId === lessonId || r.lesson_id === lessonId));
+    res.json(resources);
+  });
+
+  // Delete a resource
+  router.delete('/resources/:id', async (req, res) => {
+    const db = loadDB();
+    const resId = Number(req.params.id);
+    db.lesson_resources = (db.lesson_resources || []).filter(r => r.id !== resId);
+    saveDB(db);
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('lesson_resources').delete().eq('id', resId);
+      } catch {}
+    }
+    res.json({ success: true, deletedResourceId: resId });
   });
 
   // Course Stats (Enrolled counts & average completion rates)
@@ -1041,6 +1076,8 @@ export function createApiRouter() {
       description,
       bunnyVideoId,
       bunnyLibraryId,
+      videoLibraryId,
+      videoStatus,
       durationSeconds,
       resourceUrls,
       isFreePreview,
@@ -1054,7 +1091,9 @@ export function createApiRouter() {
       title: title || 'New Lesson',
       description: description || '',
       bunnyVideoId: bunnyVideoId || '',
-      bunnyLibraryId: bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+      bunnyLibraryId: videoLibraryId || bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+      videoLibraryId: videoLibraryId || bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+      videoStatus: videoStatus || (bunnyVideoId ? 'ready' : 'pending'),
       durationSeconds: Number(durationSeconds) || 600,
       resourceUrls: Array.isArray(resourceUrls) ? resourceUrls : [],
       isFreePreview: Boolean(isFreePreview),

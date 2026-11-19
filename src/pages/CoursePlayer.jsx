@@ -34,6 +34,29 @@ function formatSeconds(sec) {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
+function getResourceBadge(ext = 'pdf') {
+  const clean = ext.replace('.', '').toLowerCase();
+  switch (clean) {
+    case 'pdf':
+      return { label: 'PDF', bg: 'bg-rose-500/20 text-rose-300 border-rose-500/40' };
+    case 'doc':
+    case 'docx':
+      return { label: 'DOCX', bg: 'bg-blue-500/20 text-blue-300 border-blue-500/40' };
+    case 'xls':
+    case 'xlsx':
+    case 'csv':
+      return { label: 'SHEET', bg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' };
+    case 'ppt':
+    case 'pptx':
+      return { label: 'SLIDES', bg: 'bg-amber-500/20 text-amber-300 border-amber-500/40' };
+    case 'zip':
+    case 'rar':
+      return { label: 'ZIP', bg: 'bg-purple-500/20 text-purple-300 border-purple-500/40' };
+    default:
+      return { label: clean.toUpperCase(), bg: 'bg-slate-500/20 text-slate-300 border-slate-500/40' };
+  }
+}
+
 export default function CoursePlayer() {
   const params = useParams();
   const courseSlugOrId = params.slug || params.id;
@@ -280,6 +303,25 @@ export default function CoursePlayer() {
 
   const isCurrentCompleted = completedLessonIds.includes(activeLesson?.id);
 
+  const activeResources = [
+    ...(activeLesson?.resources || []).map((r) => ({
+      id: r.id,
+      title: r.title,
+      url: r.fileUrl || r.file_url || r.url,
+      size: r.fileSizeBytes || r.file_size_bytes
+        ? `${(Number(r.fileSizeBytes || r.file_size_bytes) / (1024 * 1024)).toFixed(1)} MB`
+        : (r.size || 'PDF Document'),
+      fileType: r.fileType || r.file_type || (r.title?.split('.').pop() || 'pdf').toLowerCase()
+    })),
+    ...(activeLesson?.resourceUrls || []).map((r, i) => ({
+      id: r.id || `legacy-${i}`,
+      title: r.title || r.name,
+      url: r.url,
+      size: r.size || 'PDF Document',
+      fileType: (r.title?.split('.').pop() || 'pdf').toLowerCase()
+    }))
+  ].filter((r, idx, arr) => arr.findIndex((x) => x.url === r.url) === idx);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased selection:bg-accent selection:text-slate-950">
       {/* Top Glass Navigation Bar */}
@@ -353,7 +395,7 @@ export default function CoursePlayer() {
               <BunnyVideoPlayer
                 ref={playerRef}
                 videoId={activeLesson?.bunnyVideoId || activeLesson?.bunny_video_id}
-                libraryId={activeLesson?.bunnyLibraryId || activeLesson?.bunny_library_id}
+                libraryId={activeLesson?.videoLibraryId || activeLesson?.video_library_id || activeLesson?.bunnyLibraryId || activeLesson?.bunny_library_id}
                 title={activeLesson?.title}
                 autoPlay={false}
                 hasNextLesson={Boolean(nextLesson)}
@@ -419,7 +461,7 @@ export default function CoursePlayer() {
                 { id: 'overview', label: 'Overview', icon: FileText },
                 {
                   id: 'resources',
-                  label: `Resources (${activeLesson?.resourceUrls?.length || 0})`,
+                  label: `Resources (${activeResources.length})`,
                   icon: Download
                 },
                 { id: 'notes', label: `My Notes (${notes.length})`, icon: Bookmark },
@@ -549,38 +591,42 @@ export default function CoursePlayer() {
                   </span>
                 </div>
 
-                {activeLesson?.resourceUrls && activeLesson.resourceUrls.length > 0 ? (
+                {activeResources.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {activeLesson.resourceUrls.map((res, i) => (
-                      <div
-                        key={i}
-                        className="liquid-glass liquid-glass-squircle p-5 border border-white/10 flex items-center justify-between gap-4 hover:border-accent/40 transition-all"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
-                            <FileText className="w-5 h-5" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-white truncate">
-                              {res.title || res.name || `Material-${i + 1}`}
-                            </p>
-                            <p className="text-[10px] text-white/40 mt-0.5">
-                              {res.size || 'PDF Document'} • Bunny Storage CDN
-                            </p>
-                          </div>
-                        </div>
-                        <a
-                          href={res.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          download
-                          className="p-2.5 rounded-xl bg-white/10 hover:bg-accent hover:text-slate-950 text-white transition-all shrink-0"
-                          title="Download from CDN"
+                    {activeResources.map((res, i) => {
+                      const badge = getResourceBadge(res.fileType);
+                      return (
+                        <div
+                          key={res.id || i}
+                          className="liquid-glass liquid-glass-squircle p-5 border border-white/10 flex items-center justify-between gap-4 hover:border-accent/40 transition-all"
                         >
-                          <Download className="w-4 h-4" />
-                        </a>
-                      </div>
-                    ))}
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border ${badge.bg}`}>
+                              {badge.label}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-white truncate">
+                                {res.title || `Material-${i + 1}`}
+                              </p>
+                              <p className="text-[10px] text-white/40 mt-0.5">
+                                {res.size} • Bunny Storage CDN
+                              </p>
+                            </div>
+                          </div>
+                          <a
+                            href={res.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="p-2.5 rounded-xl bg-white/10 hover:bg-accent hover:text-slate-950 text-white transition-all shrink-0 flex items-center gap-1.5 text-xs font-semibold"
+                            title="Download from CDN"
+                          >
+                            <Download className="w-4 h-4" />
+                            <span className="hidden sm:inline">Download</span>
+                          </a>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="liquid-glass rounded-2xl p-10 text-center border border-dashed border-white/10">
