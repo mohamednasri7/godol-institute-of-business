@@ -123,9 +123,9 @@ export default function AdminCourseContent() {
       const paramId = urlParams.get('courseId');
 
       if (paramId && data.some((c) => String(c.id) === String(paramId))) {
-        setSelectedCourseId(Number(paramId));
+        setSelectedCourseId(String(paramId));
       } else if (data.length > 0 && !selectedCourseId) {
-        setSelectedCourseId(data[0].id);
+        setSelectedCourseId(String(data[0].id));
       }
     } catch (err) {
       console.error('Fetch courses error:', err);
@@ -176,7 +176,7 @@ export default function AdminCourseContent() {
     fetchCurriculum();
   }, [selectedCourseId]);
 
-  const selectedCourse = curriculum.course || courses.find((c) => c.id === Number(selectedCourseId));
+  const selectedCourse = curriculum.course || courses.find((c) => String(c.id) === String(selectedCourseId));
 
   // -------------------------------------------------------------
   // MODULES: Add, Rename, Reorder, Delete
@@ -590,7 +590,7 @@ export default function AdminCourseContent() {
             <div className="flex items-center gap-3">
               <select
                 value={selectedCourseId || ''}
-                onChange={(e) => setSelectedCourseId(Number(e.target.value))}
+                onChange={(e) => setSelectedCourseId(String(e.target.value))}
                 className="bg-card border border-border rounded-xl px-4 py-2.5 text-xs font-bold text-foreground outline-none focus:border-primary w-full max-w-md shadow-sm"
               >
                 {courses.map((c) => (

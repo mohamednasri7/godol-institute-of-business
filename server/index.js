@@ -616,6 +616,32 @@ function nextId(arr) {
   return arr.length > 0 ? Math.max(...arr.map(x => x.id)) + 1 : 1;
 }
 
+// Find a course by its id — works for both UUID strings (Supabase) and legacy numeric ids
+function findCourseById(db, rawId) {
+  if (rawId === undefined || rawId === null || rawId === '') return undefined;
+  const strId = String(rawId);
+  // Exact string match (UUID or stringified integer)
+  let found = (db.courses || []).find(c => String(c.id) === strId);
+  if (!found) {
+    // Legacy: numeric match
+    const numId = Number(rawId);
+    if (!isNaN(numId) && numId > 0) found = (db.courses || []).find(c => c.id === numId);
+  }
+  return found;
+}
+
+// Find a module by its id — works for both UUID strings and legacy numeric ids
+function findModuleById(db, rawId) {
+  if (rawId === undefined || rawId === null || rawId === '') return undefined;
+  const strId = String(rawId);
+  let found = (db.course_modules || []).find(m => String(m.id) === strId);
+  if (!found) {
+    const numId = Number(rawId);
+    if (!isNaN(numId) && numId > 0) found = (db.course_modules || []).find(m => m.id === numId);
+  }
+  return found;
+}
+
 function addAuditLog(db, action, adminEmail, targetType, targetId, details) {
   const log = {
     id: nextId(db.audit_logs),
@@ -653,11 +679,11 @@ function getSettingValue(db, key) {
 // Dynamic Course Stats Calculation (Modules, Lessons, Duration, and Enrollments)
 export function enrichCourseWithDynamicStats(course, db) {
   if (!course) return course;
-  const courseId = Number(course.id);
+  const courseIdStr = String(course.id);
 
-  // 1. Get modules
+  // 1. Get modules — match by both UUID string and legacy numeric id
   const modules = (db.course_modules || []).filter(
-    m => Number(m.courseId || m.course_id) === courseId
+    m => String(m.courseId || m.course_id) === courseIdStr
   );
   const moduleCount = modules.length > 0 
     ? modules.length 
@@ -665,7 +691,7 @@ export function enrichCourseWithDynamicStats(course, db) {
 
   // 2. Get lessons (from course_lessons or modules or legacy sections)
   let lessons = (db.course_lessons || []).filter(
-    l => Number(l.courseId || l.course_id) === courseId
+    l => String(l.courseId || l.course_id) === courseIdStr
   );
   if (lessons.length === 0 && Array.isArray(course.sections)) {
     lessons = course.sections.flatMap(s => s.lessons || []);
@@ -689,7 +715,7 @@ export function enrichCourseWithDynamicStats(course, db) {
 
   // 4. Calculate real enrolled count from enrollments table
   const enrolledCount = (db.enrollments || []).filter(
-    e => (Number(e.courseId || e.course_id) === courseId) &&
+    e => String(e.courseId || e.course_id) === courseIdStr &&
          (e.accessGranted === true || e.enrollmentStatus === 'approved' || e.enrollmentStatus === 'completed')
   ).length;
 
@@ -922,20 +948,24 @@ export function createApiRouter() {
   // ─────────── INTERACTIVE COURSE CURRICULUM & LEARNING PLAYER ───────────
 
   // Get full structured curriculum (modules + lessons + resources) for a course
-  router.get('/courses/:id/curriculum', (req, res) => {
+  router.get('/courses/:id/curriculum', async (req, res) => {
+    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
-    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
+    const course = findCourseById(db, req.params.id);
     if (!course) return res.status(404).json({ error: 'Course not found' });
 
+    const courseIdStr = String(course.id);
     const modules = (db.course_modules || [])
-      .filter(m => (m.courseId === course.id || m.course_id === course.id))
+      .filter(m => String(m.courseId || m.course_id) === courseIdStr)
       .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
       .map(mod => {
+        const modIdStr = String(mod.id);
         const lessons = (db.course_lessons || [])
-          .filter(l => (l.moduleId === mod.id || l.module_id === mod.id))
+          .filter(l => String(l.moduleId || l.module_id) === modIdStr)
           .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
           .map(l => {
-            const lessonResources = (db.lesson_resources || []).filter(r => (r.lessonId === l.id || r.lesson_id === l.id));
+            const lIdStr = String(l.id);
+            const lessonResources = (db.lesson_resources || []).filter(r => String(r.lessonId || r.lesson_id) === lIdStr);
             return {
               ...l,
               bunnyVideoId: l.bunnyVideoId || l.bunny_video_id || '',
@@ -979,12 +1009,17 @@ export function createApiRouter() {
   });
 
   // Course Stats (Enrolled counts & average completion rates)
-  router.get('/courses/:id/stats', (req, res) => {
+  router.get('/courses/:id/stats', async (req, res) => {
+    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
-    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
+    const course = findCourseById(db, req.params.id);
     if (!course) return res.status(404).json({ error: 'Course not found' });
 
-    const courseEnrollments = (db.enrollments || []).filter(e => (e.courseId === course.id || e.course_id === course.id) && (e.accessGranted || e.enrollmentStatus === 'approved'));
+    const courseIdStr = String(course.id);
+    const courseEnrollments = (db.enrollments || []).filter(e =>
+      (String(e.courseId || e.course_id) === courseIdStr) &&
+      (e.accessGranted || e.enrollmentStatus === 'approved')
+    );
     const totalEnrolled = courseEnrollments.length;
     const completedCount = courseEnrollments.filter(e => Number(e.progress) >= 100).length;
     const avgProgress = totalEnrolled > 0
@@ -1002,25 +1037,41 @@ export function createApiRouter() {
   // Add a new module
   router.post('/courses/:id/modules', async (req, res) => {
     const db = loadDB();
-    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
-    if (!course) return res.status(404).json({ error: 'Course not found' });
+    if (isSupabaseConfigured) await ensureFreshData();
+    const dbFresh = loadDB();
+    const course = findCourseById(dbFresh, req.params.id);
+    if (!course) return res.status(404).json({ error: `Course not found (id: ${req.params.id}). Make sure courses are saved to Supabase first.` });
 
     const { title, sortOrder } = req.body;
+    const existingForCourse = (dbFresh.course_modules || []).filter(m => String(m.courseId || m.course_id) === String(course.id));
     const newModule = {
-      id: db.course_modules.length > 0 ? Math.max(...db.course_modules.map(m => m.id)) + 1 : 1,
-      courseId: course.id,
+      id: dbFresh.course_modules.length > 0 ? Math.max(...dbFresh.course_modules.map(m => typeof m.id === 'number' ? m.id : 0)) + 1 : 1,
+      courseId: course.id,   // keep camel for local DB
+      course_id: course.id,  // also store snake for Supabase sync
       title: title || 'New Module',
-      sortOrder: sortOrder || (db.course_modules.filter(m => m.courseId === course.id).length + 1),
+      sortOrder: sortOrder || (existingForCourse.length + 1),
+      sort_order: sortOrder || (existingForCourse.length + 1),
       createdAt: new Date().toISOString()
     };
 
-    db.course_modules.push(newModule);
-    saveDB(db);
+    dbFresh.course_modules.push(newModule);
+    saveDB(dbFresh);
 
     if (isSupabaseConfigured && supabase) {
-      await syncRecordToSupabase('course_modules', newModule);
+      try {
+        const { error: sbErr } = await supabase.from('course_modules').insert([{
+          course_id: String(course.id),
+          title: newModule.title,
+          sort_order: newModule.sortOrder
+        }]).select().single();
+        if (sbErr) {
+          console.warn('Supabase course_modules insert warning:', sbErr.message);
+        }
+      } catch (sbEx) {
+        console.warn('Supabase course_modules insert exception:', sbEx.message);
+      }
     }
-    recalculateAndSyncCourse(course.id, db);
+    recalculateAndSyncCourse(course.id, dbFresh);
 
     res.status(201).json(newModule);
   });
@@ -1028,8 +1079,8 @@ export function createApiRouter() {
   // Update a module
   router.put('/courses/:id/modules/:moduleId', async (req, res) => {
     const db = loadDB();
-    const modId = Number(req.params.moduleId);
-    const modIndex = db.course_modules.findIndex(m => m.id === modId);
+    const modIdRaw = req.params.moduleId;
+    const modIndex = db.course_modules.findIndex(m => String(m.id) === String(modIdRaw) || m.id === Number(modIdRaw));
     if (modIndex === -1) return res.status(404).json({ error: 'Module not found' });
 
     const updated = {
@@ -1049,28 +1100,32 @@ export function createApiRouter() {
   // Delete a module
   router.delete('/courses/:id/modules/:moduleId', async (req, res) => {
     const db = loadDB();
-    const modId = Number(req.params.moduleId);
-    db.course_modules = db.course_modules.filter(m => m.id !== modId);
-    db.course_lessons = db.course_lessons.filter(l => l.moduleId !== modId && l.module_id !== modId);
+    const modIdRaw = req.params.moduleId;
+    const modIdStr = String(modIdRaw);
+    db.course_modules = db.course_modules.filter(m => String(m.id) !== modIdStr && m.id !== Number(modIdRaw));
+    db.course_lessons = db.course_lessons.filter(l => String(l.moduleId || l.module_id) !== modIdStr && l.moduleId !== Number(modIdRaw) && l.module_id !== Number(modIdRaw));
     saveDB(db);
 
     if (isSupabaseConfigured && supabase) {
       try {
-        await supabase.from('course_modules').delete().eq('id', modId);
+        // Try both string and numeric delete
+        await supabase.from('course_modules').delete().eq('id', modIdRaw);
       } catch { }
     }
-    recalculateAndSyncCourse(Number(req.params.id), db);
+    const course = findCourseById(db, req.params.id);
+    if (course) recalculateAndSyncCourse(course.id, db);
 
-    res.json({ success: true, deletedModuleId: modId });
+    res.json({ success: true, deletedModuleId: modIdRaw });
   });
 
   // Add a new lesson to a module
   router.post('/courses/:id/modules/:moduleId/lessons', async (req, res) => {
     const db = loadDB();
-    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
+    const course = findCourseById(db, req.params.id);
     if (!course) return res.status(404).json({ error: 'Course not found' });
 
-    const modId = Number(req.params.moduleId);
+    const modIdRaw = req.params.moduleId;
+    const modIdStr = String(modIdRaw);
     const {
       title,
       description,
@@ -1084,10 +1139,13 @@ export function createApiRouter() {
       sortOrder
     } = req.body;
 
+    const existingLessons = (db.course_lessons || []).filter(l => String(l.moduleId || l.module_id) === modIdStr);
     const newLesson = {
-      id: db.course_lessons.length > 0 ? Math.max(...db.course_lessons.map(l => l.id)) + 1 : 1,
-      moduleId: modId,
+      id: db.course_lessons.length > 0 ? Math.max(...db.course_lessons.map(l => typeof l.id === 'number' ? l.id : 0)) + 1 : 1,
+      moduleId: modIdRaw,
+      module_id: modIdRaw,
       courseId: course.id,
+      course_id: course.id,
       title: title || 'New Lesson',
       description: description || '',
       bunnyVideoId: bunnyVideoId || '',
@@ -1097,7 +1155,7 @@ export function createApiRouter() {
       durationSeconds: Number(durationSeconds) || 600,
       resourceUrls: Array.isArray(resourceUrls) ? resourceUrls : [],
       isFreePreview: Boolean(isFreePreview),
-      sortOrder: sortOrder || (db.course_lessons.filter(l => l.moduleId === modId).length + 1),
+      sortOrder: sortOrder || (existingLessons.length + 1),
       createdAt: new Date().toISOString()
     };
 
@@ -1105,7 +1163,23 @@ export function createApiRouter() {
     saveDB(db);
 
     if (isSupabaseConfigured && supabase) {
-      await syncRecordToSupabase('course_lessons', newLesson);
+      try {
+        const { error: sbErr } = await supabase.from('course_lessons').insert([{
+          module_id: String(modIdRaw),
+          course_id: String(course.id),
+          title: newLesson.title,
+          description: newLesson.description,
+          bunny_video_id: newLesson.bunnyVideoId || null,
+          video_library_id: newLesson.videoLibraryId || null,
+          video_status: newLesson.videoStatus,
+          duration_seconds: newLesson.durationSeconds,
+          is_free_preview: newLesson.isFreePreview,
+          sort_order: newLesson.sortOrder
+        }]).select().single();
+        if (sbErr) console.warn('Supabase course_lessons insert warning:', sbErr.message);
+      } catch (sbEx) {
+        console.warn('Supabase course_lessons insert exception:', sbEx.message);
+      }
     }
     recalculateAndSyncCourse(course.id, db);
 
