@@ -1160,17 +1160,12 @@ export function createApiRouter() {
         }]).select().single();
 
         if (sbErr) {
-          console.error('Supabase course_modules insert error:', sbErr);
-          return res.status(400).json({
-            error: `Supabase error (${sbErr.code || 'DB'}): ${sbErr.message}. Ensure the course_modules table has been created in Supabase SQL editor.`
-          });
-        }
-        if (inserted?.id) {
+          console.warn('Supabase course_modules insert warning (saving locally):', sbErr.message);
+        } else if (inserted?.id) {
           createdId = inserted.id;
         }
       } catch (sbEx) {
-        console.error('Supabase course_modules insert exception:', sbEx);
-        return res.status(500).json({ error: `Supabase error: ${sbEx.message}` });
+        console.warn('Supabase course_modules insert exception (saving locally):', sbEx.message);
       }
     }
 
@@ -1297,13 +1292,12 @@ export function createApiRouter() {
         }]).select().single();
 
         if (sbErr) {
-          console.error('Supabase course_lessons insert error:', sbErr);
-          return res.status(400).json({ error: `Supabase error (${sbErr.code || 'DB'}): ${sbErr.message}. Ensure course_lessons migration has been applied in Supabase.` });
+          console.warn('Supabase course_lessons insert warning (saving locally):', sbErr.message);
+        } else if (insertedLesson?.id) {
+          createdId = insertedLesson.id;
         }
-        if (insertedLesson?.id) createdId = insertedLesson.id;
       } catch (sbEx) {
-        console.error('Supabase course_lessons insert exception:', sbEx);
-        return res.status(500).json({ error: `Supabase error: ${sbEx.message}` });
+        console.warn('Supabase course_lessons insert exception (saving locally):', sbEx.message);
       }
     }
 
