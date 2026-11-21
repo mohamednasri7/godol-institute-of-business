@@ -949,40 +949,121 @@ export function createApiRouter() {
 
   // Get full structured curriculum (modules + lessons + resources) for a course
   router.get('/courses/:id/curriculum', async (req, res) => {
-    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
-    const course = findCourseById(db, req.params.id);
+    let course = findCourseById(db, req.params.id);
+
+    // If not in memory, check Supabase directly
+    if (!course && isSupabaseConfigured && supabase) {
+      try {
+        const idQuery = !isNaN(Number(req.params.id)) ? Number(req.params.id) : req.params.id;
+        const { data: sbCourse } = await supabase.from('courses').select('*').eq('id', idQuery).maybeSingle();
+        if (sbCourse) {
+          course = rowToCamel(sbCourse);
+          db.courses = db.courses || [];
+          if (!db.courses.some(c => String(c.id) === String(course.id))) {
+            db.courses.push(course);
+          }
+        }
+      } catch (e) {
+        console.warn('Supabase course lookup warning:', e.message);
+      }
+    }
+
     if (!course) return res.status(404).json({ error: 'Course not found' });
 
+    const courseIdNum = !isNaN(Number(course.id)) ? Number(course.id) : course.id;
     const courseIdStr = String(course.id);
-    const modules = (db.course_modules || [])
-      .filter(m => String(m.courseId || m.course_id) === courseIdStr)
-      .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
-      .map(mod => {
-        const modIdStr = String(mod.id);
-        const lessons = (db.course_lessons || [])
-          .filter(l => String(l.moduleId || l.module_id) === modIdStr)
-          .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
-          .map(l => {
-            const lIdStr = String(l.id);
-            const lessonResources = (db.lesson_resources || []).filter(r => String(r.lessonId || r.lesson_id) === lIdStr);
+
+    let structuredModules = [];
+
+    // Query Supabase directly if configured
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: sbMods, error: mErr } = await supabase
+          .from('course_modules')
+          .select('*')
+          .eq('course_id', courseIdNum)
+          .order('sort_order', { ascending: true });
+
+        if (!mErr && Array.isArray(sbMods) && sbMods.length > 0) {
+          const modIds = sbMods.map(m => m.id);
+          const { data: sbLessons } = await supabase
+            .from('course_lessons')
+            .select('*')
+            .in('module_id', modIds)
+            .order('sort_order', { ascending: true });
+
+          const lessonList = Array.isArray(sbLessons) ? sbLessons : [];
+          const lessonIds = lessonList.map(l => l.id);
+
+          let resourceList = [];
+          if (lessonIds.length > 0) {
+            const { data: sbRes } = await supabase
+              .from('lesson_resources')
+              .select('*')
+              .in('lesson_id', lessonIds);
+            if (Array.isArray(sbRes)) resourceList = sbRes;
+          }
+
+          structuredModules = sbMods.map(m => {
+            const modCamel = rowToCamel(m);
+            const modLessons = lessonList
+              .filter(l => String(l.module_id) === String(m.id))
+              .map(l => {
+                const lCamel = rowToCamel(l);
+                const lRes = resourceList
+                  .filter(r => String(r.lesson_id) === String(l.id))
+                  .map(rowToCamel);
+                return {
+                  ...lCamel,
+                  bunnyVideoId: lCamel.bunnyVideoId || lCamel.bunny_video_id || '',
+                  videoLibraryId: lCamel.videoLibraryId || lCamel.video_library_id || lCamel.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+                  videoStatus: lCamel.videoStatus || lCamel.video_status || (lCamel.bunnyVideoId ? 'ready' : 'pending'),
+                  resources: lRes
+                };
+              });
             return {
-              ...l,
-              bunnyVideoId: l.bunnyVideoId || l.bunny_video_id || '',
-              videoLibraryId: l.videoLibraryId || l.video_library_id || l.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
-              videoStatus: l.videoStatus || l.video_status || (l.bunnyVideoId || l.bunny_video_id ? 'ready' : 'pending'),
-              resources: lessonResources
+              ...modCamel,
+              lessons: modLessons
             };
           });
-        return {
-          ...mod,
-          lessons
-        };
-      });
+        }
+      } catch (sbCurErr) {
+        console.warn('Direct Supabase curriculum query warning:', sbCurErr.message);
+      }
+    }
+
+    // Fall back to memory DB if Supabase modules weren't found
+    if (structuredModules.length === 0) {
+      structuredModules = (db.course_modules || [])
+        .filter(m => String(m.courseId || m.course_id) === courseIdStr)
+        .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
+        .map(mod => {
+          const modIdStr = String(mod.id);
+          const lessons = (db.course_lessons || [])
+            .filter(l => String(l.moduleId || l.module_id) === modIdStr)
+            .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
+            .map(l => {
+              const lIdStr = String(l.id);
+              const lessonResources = (db.lesson_resources || []).filter(r => String(r.lessonId || r.lesson_id) === lIdStr);
+              return {
+                ...l,
+                bunnyVideoId: l.bunnyVideoId || l.bunny_video_id || '',
+                videoLibraryId: l.videoLibraryId || l.video_library_id || l.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+                videoStatus: l.videoStatus || l.video_status || (l.bunnyVideoId || l.bunny_video_id ? 'ready' : 'pending'),
+                resources: lessonResources
+              };
+            });
+          return {
+            ...mod,
+            lessons
+          };
+        });
+    }
 
     res.json({
       course: enrichCourseWithDynamicStats(course, db),
-      modules
+      modules: structuredModules
     });
   });
 
@@ -1037,41 +1118,76 @@ export function createApiRouter() {
   // Add a new module
   router.post('/courses/:id/modules', async (req, res) => {
     const db = loadDB();
-    if (isSupabaseConfigured) await ensureFreshData();
-    const dbFresh = loadDB();
-    const course = findCourseById(dbFresh, req.params.id);
-    if (!course) return res.status(404).json({ error: `Course not found (id: ${req.params.id}). Make sure courses are saved to Supabase first.` });
+    let course = findCourseById(db, req.params.id);
+
+    // If not found in local memory, check Supabase directly
+    if (!course && isSupabaseConfigured && supabase) {
+      try {
+        const idQuery = !isNaN(Number(req.params.id)) ? Number(req.params.id) : req.params.id;
+        const { data: sbCourse } = await supabase.from('courses').select('*').eq('id', idQuery).maybeSingle();
+        if (sbCourse) {
+          course = rowToCamel(sbCourse);
+          db.courses = db.courses || [];
+          if (!db.courses.some(c => String(c.id) === String(course.id))) {
+            db.courses.push(course);
+          }
+        }
+      } catch (e) {
+        console.warn('Direct Supabase course check warning:', e.message);
+      }
+    }
+
+    if (!course) {
+      return res.status(404).json({ error: `Course not found (id: ${req.params.id}). Make sure this course is saved in Course Management.` });
+    }
 
     const { title, sortOrder } = req.body;
-    const existingForCourse = (dbFresh.course_modules || []).filter(m => String(m.courseId || m.course_id) === String(course.id));
+    const courseIdNum = !isNaN(Number(course.id)) ? Number(course.id) : course.id;
+    const existingForCourse = (db.course_modules || []).filter(m => String(m.courseId || m.course_id) === String(course.id));
+    const nextOrder = sortOrder || (existingForCourse.length + 1);
+
+    let createdId = db.course_modules?.length > 0 
+      ? Math.max(...db.course_modules.map(m => typeof m.id === 'number' ? m.id : 0)) + 1 
+      : 1;
+
+    // Direct insert to Supabase if configured
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: inserted, error: sbErr } = await supabase.from('course_modules').insert([{
+          course_id: courseIdNum,
+          title: title || 'New Module',
+          sort_order: nextOrder
+        }]).select().single();
+
+        if (sbErr) {
+          console.error('Supabase course_modules insert error:', sbErr);
+          return res.status(400).json({
+            error: `Supabase error (${sbErr.code || 'DB'}): ${sbErr.message}. Ensure the course_modules table has been created in Supabase SQL editor.`
+          });
+        }
+        if (inserted?.id) {
+          createdId = inserted.id;
+        }
+      } catch (sbEx) {
+        console.error('Supabase course_modules insert exception:', sbEx);
+        return res.status(500).json({ error: `Supabase error: ${sbEx.message}` });
+      }
+    }
+
     const newModule = {
-      id: dbFresh.course_modules.length > 0 ? Math.max(...dbFresh.course_modules.map(m => typeof m.id === 'number' ? m.id : 0)) + 1 : 1,
-      courseId: course.id,   // keep camel for local DB
-      course_id: course.id,  // also store snake for Supabase sync
+      id: createdId,
+      courseId: courseIdNum,
+      course_id: courseIdNum,
       title: title || 'New Module',
-      sortOrder: sortOrder || (existingForCourse.length + 1),
-      sort_order: sortOrder || (existingForCourse.length + 1),
+      sortOrder: nextOrder,
+      sort_order: nextOrder,
       createdAt: new Date().toISOString()
     };
 
-    dbFresh.course_modules.push(newModule);
-    saveDB(dbFresh);
-
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { error: sbErr } = await supabase.from('course_modules').insert([{
-          course_id: String(course.id),
-          title: newModule.title,
-          sort_order: newModule.sortOrder
-        }]).select().single();
-        if (sbErr) {
-          console.warn('Supabase course_modules insert warning:', sbErr.message);
-        }
-      } catch (sbEx) {
-        console.warn('Supabase course_modules insert exception:', sbEx.message);
-      }
-    }
-    recalculateAndSyncCourse(course.id, dbFresh);
+    db.course_modules = db.course_modules || [];
+    db.course_modules.push(newModule);
+    saveDB(db);
+    recalculateAndSyncCourse(course.id, db);
 
     res.status(201).json(newModule);
   });
@@ -1121,11 +1237,28 @@ export function createApiRouter() {
   // Add a new lesson to a module
   router.post('/courses/:id/modules/:moduleId/lessons', async (req, res) => {
     const db = loadDB();
-    const course = findCourseById(db, req.params.id);
-    if (!course) return res.status(404).json({ error: 'Course not found' });
+    let course = findCourseById(db, req.params.id);
+
+    if (!course && isSupabaseConfigured && supabase) {
+      try {
+        const idQuery = !isNaN(Number(req.params.id)) ? Number(req.params.id) : req.params.id;
+        const { data: sbCourse } = await supabase.from('courses').select('*').eq('id', idQuery).maybeSingle();
+        if (sbCourse) {
+          course = rowToCamel(sbCourse);
+          db.courses = db.courses || [];
+          if (!db.courses.some(c => String(c.id) === String(course.id))) {
+            db.courses.push(course);
+          }
+        }
+      } catch (e) {}
+    }
+
+    if (!course) return res.status(404).json({ error: `Course not found (id: ${req.params.id})` });
 
     const modIdRaw = req.params.moduleId;
-    const modIdStr = String(modIdRaw);
+    const modIdNum = !isNaN(Number(modIdRaw)) ? Number(modIdRaw) : modIdRaw;
+    const courseIdNum = !isNaN(Number(course.id)) ? Number(course.id) : course.id;
+
     const {
       title,
       description,
@@ -1139,13 +1272,47 @@ export function createApiRouter() {
       sortOrder
     } = req.body;
 
-    const existingLessons = (db.course_lessons || []).filter(l => String(l.moduleId || l.module_id) === modIdStr);
+    const existingLessons = (db.course_lessons || []).filter(l => String(l.moduleId || l.module_id) === String(modIdRaw));
+    const nextOrder = sortOrder || (existingLessons.length + 1);
+
+    let createdId = db.course_lessons?.length > 0 
+      ? Math.max(...db.course_lessons.map(l => typeof l.id === 'number' ? l.id : 0)) + 1 
+      : 1;
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data: insertedLesson, error: sbErr } = await supabase.from('course_lessons').insert([{
+          module_id: modIdNum,
+          course_id: courseIdNum,
+          title: title || 'New Lesson',
+          description: description || '',
+          bunny_video_id: bunnyVideoId || null,
+          video_library_id: videoLibraryId || bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+          bunny_library_id: videoLibraryId || bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+          video_status: videoStatus || (bunnyVideoId ? 'ready' : 'pending'),
+          duration_seconds: Number(durationSeconds) || 600,
+          resource_urls: Array.isArray(resourceUrls) ? resourceUrls : [],
+          is_free_preview: Boolean(isFreePreview),
+          sort_order: nextOrder
+        }]).select().single();
+
+        if (sbErr) {
+          console.error('Supabase course_lessons insert error:', sbErr);
+          return res.status(400).json({ error: `Supabase error (${sbErr.code || 'DB'}): ${sbErr.message}. Ensure course_lessons migration has been applied in Supabase.` });
+        }
+        if (insertedLesson?.id) createdId = insertedLesson.id;
+      } catch (sbEx) {
+        console.error('Supabase course_lessons insert exception:', sbEx);
+        return res.status(500).json({ error: `Supabase error: ${sbEx.message}` });
+      }
+    }
+
     const newLesson = {
-      id: db.course_lessons.length > 0 ? Math.max(...db.course_lessons.map(l => typeof l.id === 'number' ? l.id : 0)) + 1 : 1,
-      moduleId: modIdRaw,
-      module_id: modIdRaw,
-      courseId: course.id,
-      course_id: course.id,
+      id: createdId,
+      moduleId: modIdNum,
+      module_id: modIdNum,
+      courseId: courseIdNum,
+      course_id: courseIdNum,
       title: title || 'New Lesson',
       description: description || '',
       bunnyVideoId: bunnyVideoId || '',
@@ -1155,32 +1322,13 @@ export function createApiRouter() {
       durationSeconds: Number(durationSeconds) || 600,
       resourceUrls: Array.isArray(resourceUrls) ? resourceUrls : [],
       isFreePreview: Boolean(isFreePreview),
-      sortOrder: sortOrder || (existingLessons.length + 1),
+      sortOrder: nextOrder,
       createdAt: new Date().toISOString()
     };
 
+    db.course_lessons = db.course_lessons || [];
     db.course_lessons.push(newLesson);
     saveDB(db);
-
-    if (isSupabaseConfigured && supabase) {
-      try {
-        const { error: sbErr } = await supabase.from('course_lessons').insert([{
-          module_id: String(modIdRaw),
-          course_id: String(course.id),
-          title: newLesson.title,
-          description: newLesson.description,
-          bunny_video_id: newLesson.bunnyVideoId || null,
-          video_library_id: newLesson.videoLibraryId || null,
-          video_status: newLesson.videoStatus,
-          duration_seconds: newLesson.durationSeconds,
-          is_free_preview: newLesson.isFreePreview,
-          sort_order: newLesson.sortOrder
-        }]).select().single();
-        if (sbErr) console.warn('Supabase course_lessons insert warning:', sbErr.message);
-      } catch (sbEx) {
-        console.warn('Supabase course_lessons insert exception:', sbEx.message);
-      }
-    }
     recalculateAndSyncCourse(course.id, db);
 
     res.status(201).json(newLesson);
@@ -2512,6 +2660,37 @@ export function createApiRouter() {
     res.json((db.courses || []).map(c => enrichCourseWithDynamicStats(c, db)));
   });
 
+  // Explicit sync of all local courses to Supabase
+  router.post('/admin/courses/sync-to-supabase', async (req, res) => {
+    if (!isSupabaseConfigured || !supabase) {
+      return res.status(400).json({ error: 'Supabase is not configured on this server.' });
+    }
+    const db = loadDB();
+    const coursesToSync = db.courses || [];
+    let synced = 0;
+    const errors = [];
+    for (const c of coursesToSync) {
+      try {
+        const snake = rowToSnake(c, 'courses');
+        const { error } = await supabase.from('courses').upsert([snake], { onConflict: 'id' });
+        if (error) {
+          errors.push(`Course ${c.id}: ${error.message}`);
+        } else {
+          synced++;
+        }
+      } catch (err) {
+        errors.push(`Course ${c.id}: ${err.message}`);
+      }
+    }
+    await ensureFreshData(true);
+    res.json({
+      success: errors.length === 0,
+      synced,
+      total: coursesToSync.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  });
+
   router.post('/admin/courses', async (req, res) => {
     if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
@@ -2549,12 +2728,24 @@ export function createApiRouter() {
       createdAt: new Date().toISOString()
     };
 
+    // Live upsert to Supabase first if configured
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const snake = rowToSnake(newCourse, 'courses');
+        const { error: sbErr } = await supabase.from('courses').upsert([snake], { onConflict: 'id' });
+        if (sbErr) {
+          console.error('Supabase course create error:', sbErr);
+          return res.status(400).json({ error: `Supabase error (${sbErr.code || 'DB'}): ${sbErr.message}` });
+        }
+      } catch (sbEx) {
+        return res.status(500).json({ error: `Supabase error: ${sbEx.message}` });
+      }
+    }
+
     db.courses.unshift(newCourse);
     db.stats.totalCourses = db.courses.length;
     saveDB(db);
 
-    // Live upsert to Supabase
-    await syncRecordToSupabase('courses', newCourse);
     res.status(201).json(newCourse);
   });
 
@@ -2576,9 +2767,23 @@ export function createApiRouter() {
       requirements: Array.isArray(req.body.requirements) ? req.body.requirements : (prev.requirements || []),
       sections: Array.isArray(req.body.sections) ? req.body.sections : (prev.sections || [])
     };
+
+    // Live update to Supabase
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const snake = rowToSnake(updated, 'courses');
+        const { error: sbErr } = await supabase.from('courses').upsert([snake], { onConflict: 'id' });
+        if (sbErr) {
+          console.error('Supabase course update error:', sbErr);
+          return res.status(400).json({ error: `Supabase error (${sbErr.code || 'DB'}): ${sbErr.message}` });
+        }
+      } catch (sbEx) {
+        return res.status(500).json({ error: `Supabase error: ${sbEx.message}` });
+      }
+    }
+
     db.courses[idx] = updated;
     saveDB(db);
-    await syncRecordToSupabase('courses', updated);
     res.json(db.courses[idx]);
   });
 

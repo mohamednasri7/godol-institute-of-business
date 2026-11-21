@@ -41,6 +41,7 @@ export default function AdminCourses() {
   const [showModal, setShowModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
   const [toast, setToast] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [form, setForm] = useState({
     title: '', description: '', price: 0, level: 'Beginner',
     categoryName: 'Business Strategy', instructorId: null, instructorName: '', thumbnail: '/course-business.png',
@@ -58,6 +59,23 @@ export default function AdminCourses() {
     fetchInstructors();
     fetchCategories();
   }, []);
+
+  const handleSyncToSupabase = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await apiFetch('/api/admin/courses/sync-to-supabase', { method: 'POST' });
+      if (res.errors && res.errors.length > 0) {
+        showToast(`Synced ${res.synced} courses. Note: ${res.errors[0]}`, 'warning');
+      } else {
+        showToast(`Successfully synced ${res.synced} courses to Supabase!`);
+      }
+      fetchCourses();
+    } catch (err) {
+      showToast('Sync to Supabase failed: ' + err.message, 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Instant Realtime sync: updates course list across tabs and devices in 0-100ms
   useRealtimeSync(['courses', 'categories', 'instructors'], () => {
@@ -230,6 +248,15 @@ export default function AdminCourses() {
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Export CSV</span>
+          </button>
+          <button
+            onClick={handleSyncToSupabase}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs font-semibold hover:bg-emerald-100 transition-colors shadow-xs disabled:opacity-50"
+            title="Sync all courses directly to Supabase public.courses table"
+          >
+            <Upload className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync to Supabase'}</span>
           </button>
           <button onClick={openAdd} className="flex items-center gap-1.5 px-4 py-2.5 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary/90">
             <Plus className="w-4 h-4" /> Add Course
