@@ -121,3 +121,4 @@ CREATE INDEX IF NOT EXISTS idx_course_lessons_module_id ON public.course_lessons
 CREATE INDEX IF NOT EXISTS idx_course_lessons_course_id ON public.course_lessons(course_id);
 CREATE INDEX IF NOT EXISTS idx_lesson_resources_lesson_id ON public.lesson_resources(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_lesson_resources_course_id ON public.lesson_resources(course_id);
+

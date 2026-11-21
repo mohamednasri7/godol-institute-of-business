@@ -50,8 +50,8 @@ export default function AdminCourses() {
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
   const fetchCourses = () => apiFetch('/api/admin/courses').then(setCourses).catch(console.error);
-  const fetchInstructors = () => apiFetch('/api/admin/instructors').then(setInstructors).catch(() => {});
-  const fetchCategories = () => apiFetch('/api/categories').then(setCategories).catch(() => {});
+  const fetchInstructors = () => apiFetch('/api/admin/instructors').then(setInstructors).catch(() => { });
+  const fetchCategories = () => apiFetch('/api/categories').then(setCategories).catch(() => { });
 
   useEffect(() => {
     fetchCourses();

@@ -86,3 +86,4 @@ CREATE POLICY "Service role full access course_lessons" ON public.course_lessons
 DROP POLICY IF EXISTS "Service role full access lesson_resources" ON public.lesson_resources;
 CREATE POLICY "Service role full access lesson_resources" ON public.lesson_resources
     FOR ALL USING (true);
+

@@ -148,12 +148,12 @@ export default function CoursePlayer() {
     const email = currentUser?.email || '';
     apiFetch(`/api/lessons/${activeLesson.id}/notes?email=${encodeURIComponent(email)}`)
       .then(setNotes)
-      .catch(() => {});
+      .catch(() => { });
 
     // Fetch discussions
     apiFetch(`/api/lessons/${activeLesson.id}/discussions`)
       .then(setDiscussions)
-      .catch(() => {});
+      .catch(() => { });
 
     // Reset quiz state
     setQuizAnswer(null);
@@ -374,9 +374,8 @@ export default function CoursePlayer() {
           {/* Sidebar Toggle */}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className={`p-2 rounded-xl text-xs font-semibold transition-all ${
-              isSidebarOpen ? 'bg-accent/20 text-accent border border-accent/30' : 'bg-white/5 text-white/70 hover:bg-white/15'
-            }`}
+            className={`p-2 rounded-xl text-xs font-semibold transition-all ${isSidebarOpen ? 'bg-accent/20 text-accent border border-accent/30' : 'bg-white/5 text-white/70 hover:bg-white/15'
+              }`}
             title="Toggle Curriculum Sidebar"
           >
             <span className="hidden sm:inline">Curriculum</span>
@@ -430,11 +429,10 @@ export default function CoursePlayer() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => handleToggleComplete(activeLesson?.id)}
-                    className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all flex items-center gap-2 shadow-lg ${
-                      isCurrentCompleted
+                    className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all flex items-center gap-2 shadow-lg ${isCurrentCompleted
                         ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                         : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                    }`}
+                      }`}
                   >
                     {isCurrentCompleted ? (
                       <>
@@ -477,11 +475,10 @@ export default function CoursePlayer() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${
-                      isActive
+                    className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all whitespace-nowrap ${isActive
                         ? 'liquid-glass text-white border border-accent/40 shadow-sm'
                         : 'text-white/60 hover:text-white hover:bg-white/5'
-                    }`}
+                      }`}
                     style={isActive ? { background: 'hsl(42 92% 52% / 0.15)', color: 'hsl(42 92% 60%)' } : {}}
                   >
                     <Icon className="w-4 h-4" />
@@ -555,13 +552,12 @@ export default function CoursePlayer() {
                           setQuizAnswer(opt.id);
                           setQuizSubmitted(true);
                         }}
-                        className={`w-full text-left p-3 rounded-xl border text-xs transition-all flex items-center justify-between ${
-                          quizAnswer === opt.id
+                        className={`w-full text-left p-3 rounded-xl border text-xs transition-all flex items-center justify-between ${quizAnswer === opt.id
                             ? opt.isCorrect
                               ? 'bg-emerald-950/60 border-emerald-500 text-emerald-200'
                               : 'bg-rose-950/60 border-rose-500 text-rose-200'
                             : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10'
-                        }`}
+                          }`}
                       >
                         <span>{opt.id}. {opt.text}</span>
                         {quizSubmitted && quizAnswer === opt.id && (
@@ -846,11 +842,10 @@ export default function CoursePlayer() {
                             <button
                               key={lesson.id}
                               onClick={() => handleSelectLesson(lesson)}
-                              className={`w-full p-3.5 flex items-start gap-3 text-left transition-all ${
-                                isActive
+                              className={`w-full p-3.5 flex items-start gap-3 text-left transition-all ${isActive
                                   ? 'bg-accent/15 border-l-4 border-accent'
                                   : 'hover:bg-white/5'
-                              }`}
+                                }`}
                             >
                               {/* Completion Indicator */}
                               <div
@@ -858,11 +853,10 @@ export default function CoursePlayer() {
                                   e.stopPropagation();
                                   handleToggleComplete(lesson.id);
                                 }}
-                                className={`w-5 h-5 rounded-full mt-0.5 flex items-center justify-center shrink-0 transition-colors ${
-                                  isDone
+                                className={`w-5 h-5 rounded-full mt-0.5 flex items-center justify-center shrink-0 transition-colors ${isDone
                                     ? 'bg-emerald-500 text-slate-950 font-bold'
                                     : 'border border-white/20 hover:border-accent text-transparent'
-                                }`}
+                                  }`}
                               >
                                 {isDone && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                               </div>
