@@ -10,13 +10,21 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
-const BUNNY_STREAM_LIBRARY_ID = process.env.BUNNY_STREAM_LIBRARY_ID || '342890';
-const BUNNY_STREAM_API_KEY = process.env.BUNNY_STREAM_API_KEY || '';
-const BUNNY_STORAGE_ZONE_NAME = process.env.BUNNY_STORAGE_ZONE_NAME || 'godol-course-materials';
-const BUNNY_STORAGE_API_KEY = process.env.BUNNY_STORAGE_API_KEY || '';
-const BUNNY_STORAGE_HOST = process.env.BUNNY_STORAGE_HOST || 'storage.bunnycdn.com';
-const BUNNY_CDN_HOSTNAME = process.env.BUNNY_CDN_HOSTNAME || 'godol-cdn.b-cdn.net';
-const BUNNY_CDN_BASE_URL = (process.env.BUNNY_CDN_BASE_URL || `https://${BUNNY_CDN_HOSTNAME}`).replace(/\/$/, '');
+const BUNNY_STREAM_LIBRARY_ID = (process.env.BUNNY_STREAM_LIBRARY_ID || '815251').trim();
+const BUNNY_STREAM_API_KEY = (process.env.BUNNY_STREAM_API_KEY || '').trim();
+const BUNNY_STORAGE_ZONE_NAME = (process.env.BUNNY_STORAGE_ZONE_NAME || 'godolresources').trim();
+const BUNNY_STORAGE_API_KEY = (process.env.BUNNY_STORAGE_API_KEY || '').trim();
+const BUNNY_STORAGE_HOST = (process.env.BUNNY_STORAGE_HOST || 'storage.bunnycdn.com')
+  .replace(/^https?:\/\//i, '')
+  .replace(/\/.*$/, '')
+  .trim() || 'storage.bunnycdn.com';
+const BUNNY_CDN_HOSTNAME = (process.env.BUNNY_CDN_HOSTNAME || 'godolresources.b-cdn.net')
+  .replace(/^https?:\/\//i, '')
+  .replace(/\/+$/, '')
+  .trim();
+const BUNNY_CDN_BASE_URL = (process.env.BUNNY_CDN_BASE_URL || `https://${BUNNY_CDN_HOSTNAME}`)
+  .replace(/\/+$/, '')
+  .trim();
 
 export function createBunnyRouter(dbCtx = {}) {
   const router = express.Router();
@@ -441,7 +449,8 @@ export function createBunnyRouter(dbCtx = {}) {
 
         if (!storageRes.ok) {
           const errText = await storageRes.text();
-          console.warn(`Bunny storage upload warning: ${storageRes.status} ${errText}`);
+          console.error(`Bunny storage upload error: ${storageRes.status} ${errText}`);
+          throw new Error(`Bunny Storage upload error (${storageRes.status}): ${errText || 'Invalid Storage API Key or Storage Zone'}`);
         }
       }
 

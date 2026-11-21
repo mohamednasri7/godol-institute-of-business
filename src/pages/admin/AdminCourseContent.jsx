@@ -32,7 +32,7 @@ import { apiFetch } from '../../lib/api';
 import { bunnyService } from '../../lib/bunnyService';
 import * as tus from 'tus-js-client';
 
-const DEFAULT_LIBRARY_ID = import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '342890';
+const DEFAULT_LIBRARY_ID = import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '815251';
 
 // Helper for human-readable file sizes
 function formatBytes(bytes) {

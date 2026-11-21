@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Maximize, CheckCircle, ArrowRight, X } from 'lucide-react';
 
-const DEFAULT_LIBRARY_ID = import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '342890';
+const DEFAULT_LIBRARY_ID = import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '815251';
 
 /**
  * BunnyVideoPlayer - High-performance Bunny Stream Video Player

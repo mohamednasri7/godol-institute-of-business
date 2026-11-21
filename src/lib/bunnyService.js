@@ -4,8 +4,8 @@
  * and direct chunked/streamed uploads via backend proxy endpoints.
  */
 
-const DEFAULT_LIBRARY_ID = import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '342890';
-const DEFAULT_CDN_HOSTNAME = import.meta.env.VITE_BUNNY_CDN_HOSTNAME || 'godol-cdn.b-cdn.net';
+const DEFAULT_LIBRARY_ID = import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '815251';
+const DEFAULT_CDN_HOSTNAME = import.meta.env.VITE_BUNNY_CDN_HOSTNAME || 'godolresources.b-cdn.net';
 const DEFAULT_CDN_BASE_URL = (import.meta.env.VITE_BUNNY_CDN_BASE_URL || `https://${DEFAULT_CDN_HOSTNAME}`).replace(/\/$/, '');
 
 export const bunnyService = {
