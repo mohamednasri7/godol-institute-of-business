@@ -643,18 +643,45 @@ function nextId(arr) {
   return arr.length > 0 ? Math.max(...arr.map(x => x.id)) + 1 : 1;
 }
 
-// Find a course by its id — works for both UUID strings (Supabase) and legacy numeric ids
+// Find a course by its id — works for both UUID strings (Supabase), legacy numeric ids,
+// exact slug matches, and compound slug-id patterns like "my-course-title-4"
 function findCourseById(db, rawId) {
   if (rawId === undefined || rawId === null || rawId === '') return undefined;
   const strId = String(rawId);
-  // Exact string match (UUID or stringified integer)
-  let found = (db.courses || []).find(c => String(c.id) === strId);
-  if (!found) {
-    // Legacy: numeric match
-    const numId = Number(rawId);
-    if (!isNaN(numId) && numId > 0) found = (db.courses || []).find(c => c.id === numId);
+  const courses = db.courses || [];
+
+  // 1. Exact numeric id match
+  const numId = Number(rawId);
+  if (!isNaN(numId) && numId > 0) {
+    const byNum = courses.find(c => c.id === numId || String(c.id) === strId);
+    if (byNum) return byNum;
   }
-  return found;
+
+  // 2. Exact string match (UUID or stringified integer)
+  const byStr = courses.find(c => String(c.id) === strId);
+  if (byStr) return byStr;
+
+  // 3. Exact slug match
+  const bySlug = courses.find(c => c.slug === strId);
+  if (bySlug) return bySlug;
+
+  // 4. Slug prefix match — handle compound slugs like "my-course-title-4"
+  //    Try stripping trailing "-<number>" to match a stored slug
+  const slugWithSuffixMatch = strId.match(/^(.+)-(\d+)$/);
+  if (slugWithSuffixMatch) {
+    const slugPart = slugWithSuffixMatch[1];
+    const idPart = Number(slugWithSuffixMatch[2]);
+    // Try id match first (most reliable)
+    if (!isNaN(idPart) && idPart > 0) {
+      const byTrailingId = courses.find(c => c.id === idPart);
+      if (byTrailingId) return byTrailingId;
+    }
+    // Then try matching the slug prefix
+    const bySlugPrefix = courses.find(c => c.slug === slugPart || c.slug === strId);
+    if (bySlugPrefix) return bySlugPrefix;
+  }
+
+  return undefined;
 }
 
 // Find a module by its id — works for both UUID strings and legacy numeric ids
@@ -953,9 +980,45 @@ export function createApiRouter() {
     res.json(result);
   });
 
-  router.get('/courses/:id', (req, res) => {
+  router.get('/courses/:id', async (req, res) => {
     const db = loadDB();
-    const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
+    const rawId = req.params.id;
+    let course = findCourseById(db, rawId);
+
+    // If not found in memory by id/slug, try Supabase with slug and trailing-id patterns
+    if (!course && isSupabaseConfigured && supabase) {
+      try {
+        const slugWithSuffix = rawId.match(/^(.+)-(\d+)$/);
+        const numericId = slugWithSuffix ? Number(slugWithSuffix[2]) : (!isNaN(Number(rawId)) ? Number(rawId) : null);
+        const slugPart = slugWithSuffix ? slugWithSuffix[1] : rawId;
+
+        // Try numeric id first
+        if (numericId && numericId > 0) {
+          const { data: byId } = await supabase.from('courses').select('*').eq('id', numericId).maybeSingle();
+          if (byId) course = rowToCamel(byId);
+        }
+        // Then try full slug
+        if (!course) {
+          const { data: bySlug } = await supabase.from('courses').select('*').eq('slug', rawId).maybeSingle();
+          if (bySlug) course = rowToCamel(bySlug);
+        }
+        // Then try slug prefix (without the numeric suffix)
+        if (!course && slugPart !== rawId) {
+          const { data: bySlugPrefix } = await supabase.from('courses').select('*').eq('slug', slugPart).maybeSingle();
+          if (bySlugPrefix) course = rowToCamel(bySlugPrefix);
+        }
+        // Cache in memory for next call
+        if (course) {
+          db.courses = db.courses || [];
+          if (!db.courses.some(c => String(c.id) === String(course.id))) {
+            db.courses.push(course);
+          }
+        }
+      } catch (e) {
+        console.warn('Supabase course lookup warning:', e.message);
+      }
+    }
+
     if (!course) return res.status(404).json({ error: 'Course not found' });
     res.json(enrichCourseWithDynamicStats(course, db));
   });
@@ -1006,12 +1069,30 @@ export function createApiRouter() {
     let course = findCourseById(db, req.params.id);
 
     // If not in memory, check Supabase directly with fast timeout
+    // Also handles compound slug patterns like "my-course-title-4"
     if (!course && isSupabaseConfigured && supabase) {
       try {
-        const idQuery = !isNaN(Number(req.params.id)) ? Number(req.params.id) : req.params.id;
-        const { data: sbCourse } = await supabase.from('courses').select('*').eq('id', idQuery).maybeSingle();
-        if (sbCourse) {
-          course = rowToCamel(sbCourse);
+        const rawId = req.params.id;
+        const slugWithSuffix = rawId.match(/^(.+)-(\d+)$/);
+        const numericId = slugWithSuffix ? Number(slugWithSuffix[2]) : (!isNaN(Number(rawId)) ? Number(rawId) : null);
+        const slugPart = slugWithSuffix ? slugWithSuffix[1] : rawId;
+
+        // Try numeric id first
+        if (numericId && numericId > 0) {
+          const { data: byId } = await supabase.from('courses').select('*').eq('id', numericId).maybeSingle();
+          if (byId) course = rowToCamel(byId);
+        }
+        // Try full slug
+        if (!course) {
+          const { data: bySlug } = await supabase.from('courses').select('*').eq('slug', rawId).maybeSingle();
+          if (bySlug) course = rowToCamel(bySlug);
+        }
+        // Try slug prefix (strip trailing -N)
+        if (!course && slugPart !== rawId) {
+          const { data: bySlugPrefix } = await supabase.from('courses').select('*').eq('slug', slugPart).maybeSingle();
+          if (bySlugPrefix) course = rowToCamel(bySlugPrefix);
+        }
+        if (course) {
           db.courses = db.courses || [];
           if (!db.courses.some(c => String(c.id) === String(course.id))) {
             db.courses.push(course);
@@ -1214,12 +1295,23 @@ export function createApiRouter() {
         }]).select().single();
 
         if (sbErr) {
-          console.warn('Supabase course_modules insert warning (saving locally):', sbErr.message);
+          console.warn('Supabase course_modules insert error:', sbErr.message, sbErr.code);
+          // Surface schema cache / table-not-found errors clearly to the client
+          if (sbErr.code === 'PGRST205' || sbErr.code === '42P01' || sbErr.message?.includes('schema cache') || sbErr.message?.includes('does not exist')) {
+            return res.status(500).json({
+              error: `Supabase error [${sbErr.code}]: ${sbErr.message}. Run the SQL migration in your Supabase SQL editor to create the course_modules table, then click "Reload Schema" in the admin panel.`
+            });
+          }
+          // For other Supabase errors (RLS, FK violations, etc.) also surface them
+          return res.status(500).json({
+            error: `Supabase insert error: ${sbErr.message} (code: ${sbErr.code})`
+          });
         } else if (inserted?.id) {
           createdId = inserted.id;
         }
       } catch (sbEx) {
-        console.warn('Supabase course_modules insert exception (saving locally):', sbEx.message);
+        console.warn('Supabase course_modules insert exception:', sbEx.message);
+        return res.status(500).json({ error: `Supabase connection error: ${sbEx.message}` });
       }
     }
 
@@ -2732,6 +2824,32 @@ export function createApiRouter() {
       total: coursesToSync.length,
       errors: errors.length > 0 ? errors : undefined
     });
+  });
+
+  // Reload Supabase PostgREST schema cache — fixes PGRST205 "table not in schema cache" errors
+  router.post('/admin/supabase/reload-schema', async (req, res) => {
+    if (!isSupabaseConfigured || !supabase) {
+      return res.status(400).json({ error: 'Supabase is not configured.' });
+    }
+    try {
+      // Clear local KNOWN_UNAVAILABLE_TABLES cache so we retry those tables
+      KNOWN_UNAVAILABLE_TABLES.clear();
+      // Also try to query course_modules directly to see if it's reachable now
+      const { data, error } = await supabase.from('course_modules').select('id').limit(1);
+      if (error) {
+        if (error.code === 'PGRST205' || error.message?.includes('schema cache')) {
+          return res.json({
+            success: false,
+            message: `Schema cache still stale (${error.code}). Go to your Supabase dashboard → SQL Editor and run: SELECT pg_notify('pgrst', 'reload schema'); — then try again.`,
+            code: error.code
+          });
+        }
+        return res.json({ success: false, message: error.message, code: error.code });
+      }
+      res.json({ success: true, message: 'Schema cache refreshed. course_modules table is reachable.' });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   router.post('/admin/courses', async (req, res) => {

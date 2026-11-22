@@ -107,9 +107,30 @@ export default function AdminCourseContent() {
 
   // Toast notifications
   const [toast, setToast] = useState(null);
+  const [schemaError, setSchemaError] = useState(false); // true when PGRST205 is detected
+  const [isReloadingSchema, setIsReloadingSchema] = useState(false);
+
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 6000);
+  };
+
+  const handleReloadSchema = async () => {
+    setIsReloadingSchema(true);
+    try {
+      const res = await apiFetch('/api/admin/supabase/reload-schema', { method: 'POST' });
+      if (res.success) {
+        setSchemaError(false);
+        showToast('✅ Schema cache refreshed! Try saving your module again.');
+        fetchCurriculum();
+      } else {
+        showToast(res.message || 'Schema still stale. Run SQL in Supabase dashboard.', 'error');
+      }
+    } catch (err) {
+      showToast('Reload failed: ' + err.message, 'error');
+    } finally {
+      setIsReloadingSchema(false);
+    }
   };
 
   // Fetch all courses and honor ?courseId= from URL
@@ -201,10 +222,16 @@ export default function AdminCourseContent() {
       });
       setNewModuleTitle('');
       setIsAddingModule(false);
+      setSchemaError(false);
       showToast('Module created successfully');
       fetchCurriculum();
     } catch (err) {
-      showToast('Could not add module: ' + err.message, 'error');
+      const msg = err.message || '';
+      // Detect Supabase schema cache errors
+      if (msg.includes('PGRST205') || msg.includes('schema cache') || msg.includes('does not exist')) {
+        setSchemaError(true);
+      }
+      showToast(msg || 'Could not add module', 'error');
     }
   };
 
@@ -580,13 +607,38 @@ export default function AdminCourseContent() {
         {/* Toast alert */}
         {toast && (
           <div
-            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 animate-fadeIn border ${toast.type === 'error'
+            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 animate-fadeIn border max-w-sm ${toast.type === 'error'
                 ? 'bg-rose-950/90 text-rose-200 border-rose-500/50'
                 : 'bg-slate-900/90 text-white border-white/20'
               }`}
           >
-            {toast.type === 'error' ? <AlertCircle className="w-4 h-4 text-rose-400" /> : <CheckCircle className="w-4 h-4 text-emerald-400" />}
-            <span>{toast.msg}</span>
+            {toast.type === 'error' ? <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" /> : <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />}
+            <span className="leading-snug">{toast.msg}</span>
+          </div>
+        )}
+
+        {/* Schema cache error banner — shown when PGRST205 is detected */}
+        {schemaError && (
+          <div className="bg-amber-500/10 border border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-amber-700">Supabase schema cache is stale</p>
+              <p className="text-xs text-amber-600/80 mt-0.5">
+                The <code className="bg-amber-500/10 px-1 rounded">course_modules</code> table exists but PostgREST can't see it yet.
+                Run this in your <strong>Supabase SQL Editor</strong> first:
+              </p>
+              <code className="block mt-1.5 text-[11px] bg-black/10 rounded-lg px-3 py-1.5 text-amber-800 font-mono select-all">
+                SELECT pg_notify('pgrst', 'reload schema');
+              </code>
+            </div>
+            <button
+              onClick={handleReloadSchema}
+              disabled={isReloadingSchema}
+              className="shrink-0 px-4 py-2 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isReloadingSchema ? 'animate-spin' : ''}`} />
+              {isReloadingSchema ? 'Reloading...' : 'Reload Schema'}
+            </button>
           </div>
         )}
 
