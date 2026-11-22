@@ -107,12 +107,72 @@ export default function AdminCourseContent() {
 
   // Toast notifications
   const [toast, setToast] = useState(null);
-  const [schemaError, setSchemaError] = useState(false); // true when PGRST205 is detected
+  const [schemaError, setSchemaError] = useState(false);
   const [isReloadingSchema, setIsReloadingSchema] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 6000);
+    setTimeout(() => setToast(null), 5000);
+  };
+
+  const handleCopySql = () => {
+    const sql = `-- Run this in Supabase SQL Editor:
+CREATE TABLE IF NOT EXISTS public.course_modules (
+  id BIGSERIAL PRIMARY KEY,
+  course_id BIGINT NOT NULL,
+  title TEXT NOT NULL,
+  sort_order INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.course_lessons (
+  id BIGSERIAL PRIMARY KEY,
+  module_id BIGINT NOT NULL,
+  course_id BIGINT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  bunny_video_id TEXT,
+  video_library_id TEXT DEFAULT '815251',
+  video_status TEXT DEFAULT 'pending',
+  duration_seconds INT DEFAULT 0,
+  is_free_preview BOOLEAN DEFAULT false,
+  sort_order INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.lesson_resources (
+  id BIGSERIAL PRIMARY KEY,
+  lesson_id BIGINT NOT NULL,
+  course_id BIGINT,
+  title TEXT NOT NULL,
+  file_url TEXT NOT NULL,
+  file_type TEXT DEFAULT 'pdf',
+  file_size BIGINT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.course_modules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.course_lessons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lesson_resources ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can manage course_modules" ON public.course_modules;
+CREATE POLICY "Public can manage course_modules" ON public.course_modules FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public can manage course_lessons" ON public.course_lessons;
+CREATE POLICY "Public can manage course_lessons" ON public.course_lessons FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public can manage lesson_resources" ON public.lesson_resources;
+CREATE POLICY "Public can manage lesson_resources" ON public.lesson_resources FOR ALL USING (true) WITH CHECK (true);
+
+NOTIFY pgrst, 'reload schema';`;
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(sql);
+      setCopiedSql(true);
+      showToast('SQL migration copied to clipboard! Paste and Run in Supabase SQL Editor.');
+      setTimeout(() => setCopiedSql(false), 3000);
+    }
   };
 
   const handleReloadSchema = async () => {
@@ -121,13 +181,14 @@ export default function AdminCourseContent() {
       const res = await apiFetch('/api/admin/supabase/reload-schema', { method: 'POST' });
       if (res.success) {
         setSchemaError(false);
-        showToast('✅ Schema cache refreshed! Try saving your module again.');
+        showToast('✅ Supabase course_modules table is connected and ready!');
         fetchCurriculum();
       } else {
-        showToast(res.message || 'Schema still stale. Run SQL in Supabase dashboard.', 'error');
+        setSchemaError(true);
+        showToast(res.message || 'Table not found yet. Run the SQL script in Supabase first.', 'warning');
       }
     } catch (err) {
-      showToast('Reload failed: ' + err.message, 'error');
+      showToast('Connection check failed: ' + err.message, 'error');
     } finally {
       setIsReloadingSchema(false);
     }
@@ -216,22 +277,24 @@ export default function AdminCourseContent() {
     if (!newModuleTitle.trim() || !selectedCourseId) return;
 
     try {
-      await apiFetch(`/api/courses/${selectedCourseId}/modules`, {
+      const res = await apiFetch(`/api/courses/${selectedCourseId}/modules`, {
         method: 'POST',
         body: JSON.stringify({ title: newModuleTitle.trim() })
       });
       setNewModuleTitle('');
       setIsAddingModule(false);
-      setSchemaError(false);
-      showToast('Module created successfully');
+      if (res && res.warning) {
+        showToast('Module created! (Saved locally & synced to course sections)');
+      } else {
+        showToast('Module created successfully');
+      }
       fetchCurriculum();
     } catch (err) {
       const msg = err.message || '';
-      // Detect Supabase schema cache errors
       if (msg.includes('PGRST205') || msg.includes('schema cache') || msg.includes('does not exist')) {
         setSchemaError(true);
       }
-      showToast(msg || 'Could not add module', 'error');
+      showToast('Could not add module: ' + msg, 'error');
     }
   };
 
@@ -608,8 +671,8 @@ export default function AdminCourseContent() {
         {toast && (
           <div
             className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2 animate-fadeIn border max-w-sm ${toast.type === 'error'
-                ? 'bg-rose-950/90 text-rose-200 border-rose-500/50'
-                : 'bg-slate-900/90 text-white border-white/20'
+              ? 'bg-rose-950/90 text-rose-200 border-rose-500/50'
+              : 'bg-slate-900/90 text-white border-white/20'
               }`}
           >
             {toast.type === 'error' ? <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" /> : <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />}
@@ -617,28 +680,55 @@ export default function AdminCourseContent() {
           </div>
         )}
 
-        {/* Schema cache error banner — shown when PGRST205 is detected */}
+        {/* Supabase Table Setup Notice / Helper */}
         {schemaError && (
-          <div className="bg-amber-500/10 border border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-amber-700">Supabase schema cache is stale</p>
-              <p className="text-xs text-amber-600/80 mt-0.5">
-                The <code className="bg-amber-500/10 px-1 rounded">course_modules</code> table exists but PostgREST can't see it yet.
-                Run this in your <strong>Supabase SQL Editor</strong> first:
-              </p>
-              <code className="block mt-1.5 text-[11px] bg-black/10 rounded-lg px-3 py-1.5 text-amber-800 font-mono select-all">
-                SELECT pg_notify('pgrst', 'reload schema');
-              </code>
+          <div className="bg-amber-500/10 border border-amber-500/40 rounded-2xl p-5 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                    Supabase dedicated curriculum tables (<code className="font-mono text-xs">course_modules</code>) not created yet
+                  </p>
+                  <p className="text-xs text-amber-700/90 dark:text-amber-400/90 mt-0.5">
+                    Your modules and lessons are being saved locally and synced to course sections. To create the tables directly in Supabase:
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSchemaError(false)}
+                className="text-muted-foreground hover:text-foreground p-1 text-xs"
+                title="Dismiss"
+              >
+                ✕
+              </button>
             </div>
-            <button
-              onClick={handleReloadSchema}
-              disabled={isReloadingSchema}
-              className="shrink-0 px-4 py-2 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5 transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isReloadingSchema ? 'animate-spin' : ''}`} />
-              {isReloadingSchema ? 'Reloading...' : 'Reload Schema'}
-            </button>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                onClick={handleCopySql}
+                className="px-3.5 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 flex items-center gap-1.5 transition-colors shadow-sm"
+              >
+                <span>{copiedSql ? '✓ Copied SQL!' : 'Copy SQL Migration'}</span>
+              </button>
+              <a
+                href="https://supabase.com/dashboard/project/vljphjdpaflahytyszaq/sql"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3.5 py-1.5 rounded-xl border border-amber-600/40 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Open Supabase SQL Editor</span>
+              </a>
+              <button
+                onClick={handleReloadSchema}
+                disabled={isReloadingSchema}
+                className="px-3.5 py-1.5 rounded-xl border border-border bg-card hover:bg-muted/50 text-xs font-semibold text-foreground flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isReloadingSchema ? 'animate-spin' : ''}`} />
+                <span>{isReloadingSchema ? 'Checking...' : 'Verify Supabase Connection'}</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -699,8 +789,8 @@ export default function AdminCourseContent() {
                 <button
                   onClick={handleTogglePublish}
                   className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedCourse.status === 'published'
-                      ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
-                      : 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
+                    ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30'
+                    : 'bg-amber-500/15 text-amber-600 border border-amber-500/30'
                     }`}
                 >
                   {selectedCourse.status === 'published' ? 'Status: Published ✓' : 'Status: Draft'}
@@ -880,8 +970,8 @@ export default function AdminCourseContent() {
                             key={lesson.id || lIdx}
                             onClick={() => openLessonDrawer(lesson, mod)}
                             className={`p-3.5 rounded-xl flex items-center justify-between text-xs transition-all cursor-pointer border ${isSelected
-                                ? 'bg-primary/10 border-primary shadow-sm'
-                                : 'bg-card/70 hover:bg-card border-border/60 hover:border-primary/40'
+                              ? 'bg-primary/10 border-primary shadow-sm'
+                              : 'bg-card/70 hover:bg-card border-border/60 hover:border-primary/40'
                               }`}
                           >
                             <div className="flex items-center gap-3 min-w-0">
@@ -1081,8 +1171,8 @@ export default function AdminCourseContent() {
                 <button
                   onClick={() => setDrawerTab('video')}
                   className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${drawerTab === 'video'
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                     }`}
                 >
                   <Video className="w-4 h-4" />
@@ -1091,8 +1181,8 @@ export default function AdminCourseContent() {
                 <button
                   onClick={() => setDrawerTab('resources')}
                   className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${drawerTab === 'resources'
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                     }`}
                 >
                   <FileText className="w-4 h-4" />
@@ -1169,8 +1259,8 @@ export default function AdminCourseContent() {
                     }}
                     onClick={() => videoInputRef.current?.click()}
                     className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer ${videoDragOver
-                        ? 'border-primary bg-primary/10 scale-[1.01]'
-                        : 'border-border hover:border-primary/50 bg-card/40 hover:bg-card'
+                      ? 'border-primary bg-primary/10 scale-[1.01]'
+                      : 'border-border hover:border-primary/50 bg-card/40 hover:bg-card'
                       }`}
                   >
                     <input
@@ -1303,8 +1393,8 @@ export default function AdminCourseContent() {
                     }}
                     onClick={() => resourceInputRef.current?.click()}
                     className={`border-2 border-dashed rounded-3xl p-8 text-center transition-all cursor-pointer ${resourceDragOver
-                        ? 'border-blue-500 bg-blue-500/10 scale-[1.01]'
-                        : 'border-border hover:border-blue-500/50 bg-card/40 hover:bg-card'
+                      ? 'border-blue-500 bg-blue-500/10 scale-[1.01]'
+                      : 'border-border hover:border-blue-500/50 bg-card/40 hover:bg-card'
                       }`}
                   >
                     <input

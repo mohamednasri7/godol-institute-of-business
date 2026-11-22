@@ -822,13 +822,36 @@ export function enrichInstructorWithDynamicStats(instructor, db) {
 
 export function recalculateAndSyncCourse(courseId, db) {
   if (!courseId) return;
-  const course = db.courses.find(c => c.id === Number(courseId));
+  const course = db.courses.find(c => c.id === Number(courseId) || String(c.id) === String(courseId));
   if (!course) return;
   const enriched = enrichCourseWithDynamicStats(course, db);
   course.lessonCount = enriched.lessonCount;
   course.moduleCount = enriched.moduleCount;
   course.durationHours = enriched.durationHours;
   course.enrolledCount = enriched.enrolledCount;
+
+  // Keep course.sections in sync with modules and lessons so Supabase courses table always has full curriculum
+  const courseMods = (db.course_modules || []).filter(m => String(m.courseId || m.course_id) === String(course.id));
+  course.sections = courseMods.map(m => {
+    const modLessons = (db.course_lessons || []).filter(l => String(l.moduleId || l.module_id) === String(m.id));
+    return {
+      id: m.id,
+      title: m.title,
+      sortOrder: m.sortOrder || m.sort_order || 0,
+      lessons: modLessons.map(l => ({
+        id: l.id,
+        title: l.title,
+        description: l.description || '',
+        bunnyVideoId: l.bunnyVideoId || l.bunny_video_id || '',
+        videoLibraryId: l.videoLibraryId || l.video_library_id || process.env.BUNNY_STREAM_LIBRARY_ID || '815251',
+        videoStatus: l.videoStatus || (l.bunnyVideoId ? 'ready' : 'pending'),
+        durationSeconds: l.durationSeconds || l.duration_seconds || 900,
+        isFreePreview: Boolean(l.isFreePreview || l.is_free_preview),
+        resources: (db.lesson_resources || []).filter(r => String(r.lessonId || r.lesson_id) === String(l.id))
+      }))
+    };
+  });
+
   saveDB(db);
   if (isSupabaseConfigured && supabase) {
     syncRecordToSupabase('courses', course).catch(() => {});
@@ -1285,7 +1308,9 @@ export function createApiRouter() {
       ? Math.max(...db.course_modules.map(m => typeof m.id === 'number' ? m.id : 0)) + 1 
       : 1;
 
-    // Direct insert to Supabase if configured
+    // Direct insert to Supabase if configured and table exists
+    let savedToSupabase = false;
+    let supabaseErrorNotice = null;
     if (isSupabaseConfigured && supabase) {
       try {
         const { data: inserted, error: sbErr } = await supabase.from('course_modules').insert([{
@@ -1295,23 +1320,20 @@ export function createApiRouter() {
         }]).select().single();
 
         if (sbErr) {
-          console.warn('Supabase course_modules insert error:', sbErr.message, sbErr.code);
-          // Surface schema cache / table-not-found errors clearly to the client
-          if (sbErr.code === 'PGRST205' || sbErr.code === '42P01' || sbErr.message?.includes('schema cache') || sbErr.message?.includes('does not exist')) {
-            return res.status(500).json({
-              error: `Supabase error [${sbErr.code}]: ${sbErr.message}. Run the SQL migration in your Supabase SQL editor to create the course_modules table, then click "Reload Schema" in the admin panel.`
-            });
+          console.warn('Supabase course_modules insert warning (saving locally):', sbErr.message, sbErr.code);
+          if (sbErr.code === 'PGRST205' || sbErr.code === '42P01' || sbErr.message?.includes('schema cache')) {
+            supabaseErrorNotice = 'Table course_modules not in Supabase yet. Saved locally and synced to course sections.';
+            KNOWN_UNAVAILABLE_TABLES.set('course_modules', Date.now());
+          } else {
+            supabaseErrorNotice = `Supabase insert warning: ${sbErr.message}`;
           }
-          // For other Supabase errors (RLS, FK violations, etc.) also surface them
-          return res.status(500).json({
-            error: `Supabase insert error: ${sbErr.message} (code: ${sbErr.code})`
-          });
         } else if (inserted?.id) {
           createdId = inserted.id;
+          savedToSupabase = true;
         }
       } catch (sbEx) {
-        console.warn('Supabase course_modules insert exception:', sbEx.message);
-        return res.status(500).json({ error: `Supabase connection error: ${sbEx.message}` });
+        console.warn('Supabase course_modules insert exception (saving locally):', sbEx.message);
+        supabaseErrorNotice = sbEx.message;
       }
     }
 
@@ -1330,7 +1352,11 @@ export function createApiRouter() {
     saveDB(db);
     recalculateAndSyncCourse(course.id, db);
 
-    res.status(201).json(newModule);
+    res.status(201).json({
+      ...newModule,
+      savedToSupabase,
+      warning: supabaseErrorNotice
+    });
   });
 
   // Update a module
@@ -2826,27 +2852,28 @@ export function createApiRouter() {
     });
   });
 
-  // Reload Supabase PostgREST schema cache — fixes PGRST205 "table not in schema cache" errors
+  // Verify Supabase PostgREST tables & reload schema cache
   router.post('/admin/supabase/reload-schema', async (req, res) => {
     if (!isSupabaseConfigured || !supabase) {
       return res.status(400).json({ error: 'Supabase is not configured.' });
     }
     try {
-      // Clear local KNOWN_UNAVAILABLE_TABLES cache so we retry those tables
+      // Clear local KNOWN_UNAVAILABLE_TABLES cache so we retry all tables
       KNOWN_UNAVAILABLE_TABLES.clear();
-      // Also try to query course_modules directly to see if it's reachable now
+      // Test querying course_modules directly to see if it exists in Supabase
       const { data, error } = await supabase.from('course_modules').select('id').limit(1);
       if (error) {
         if (error.code === 'PGRST205' || error.message?.includes('schema cache')) {
           return res.json({
             success: false,
-            message: `Schema cache still stale (${error.code}). Go to your Supabase dashboard → SQL Editor and run: SELECT pg_notify('pgrst', 'reload schema'); — then try again.`,
+            tableExists: false,
+            message: `The course_modules table has not been created in Supabase yet (PGRST205). Copy the SQL from supabase-migration-fix.sql, paste it in Supabase SQL Editor and click Run.`,
             code: error.code
           });
         }
-        return res.json({ success: false, message: error.message, code: error.code });
+        return res.json({ success: false, tableExists: false, message: error.message, code: error.code });
       }
-      res.json({ success: true, message: 'Schema cache refreshed. course_modules table is reachable.' });
+      res.json({ success: true, tableExists: true, message: '✅ course_modules table is created and connected in Supabase!' });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }

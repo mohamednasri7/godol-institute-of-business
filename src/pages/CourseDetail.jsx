@@ -3,12 +3,34 @@ import { useLocation, useParams, Link } from 'wouter';
 import {
   Star, Clock, BookOpen, CheckCircle, PlayCircle, Lock,
   Share2, Award, ChevronDown, ChevronUp, X, ShieldCheck,
-  AlertCircle, CreditCard, Play, ArrowRight, Sparkles, Users
+  AlertCircle, CreditCard, Play, ArrowRight, Sparkles, Users,
+  Download, FileText, FileSpreadsheet, Presentation, Archive, File
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { auth } from '../lib/auth';
 import { useRealtimeSync } from '../hooks/useRealtimeSync';
 import BunnyVideoPlayer from '../components/course/BunnyVideoPlayer';
+
+// Return a readable label & icon for a resource file type
+function ResourceBadge({ fileType = 'pdf' }) {
+  const clean = fileType.replace('.', '').toLowerCase();
+  const map = {
+    pdf: { label: 'PDF', cls: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30' },
+    doc: { label: 'DOC', cls: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30' },
+    docx: { label: 'DOCX', cls: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30' },
+    xls: { label: 'XLS', cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' },
+    xlsx: { label: 'XLSX', cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' },
+    ppt: { label: 'PPT', cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' },
+    pptx: { label: 'PPTX', cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30' },
+    zip: { label: 'ZIP', cls: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30' },
+  };
+  const cfg = map[clean] || { label: clean.toUpperCase(), cls: 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30' };
+  return (
+    <span className={`inline-block text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${cfg.cls}`}>
+      {cfg.label}
+    </span>
+  );
+}
 
 export default function CourseDetail() {
   const { id } = useParams();
@@ -186,9 +208,13 @@ export default function CourseDetail() {
   if (!course) {
     return (
       <div className="min-h-screen pt-36 text-center container mx-auto px-4">
-        <h2 className="text-2xl font-bold mb-4">Course not found</h2>
+        <AlertCircle className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold mb-2">Course not found</h2>
+        <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+          This course may still be in draft or the link may be incorrect.
+        </p>
         <Link href="/courses" className="text-primary hover:underline font-semibold">
-          ← Back to all courses
+          ← Browse all courses
         </Link>
       </div>
     );
@@ -453,48 +479,69 @@ export default function CourseDetail() {
                             {modLessons.map((lesson) => (
                               <div
                                 key={lesson.id}
-                                className="py-4 flex items-center justify-between gap-4"
+                                className="py-4 space-y-2.5"
                               >
-                                <div className="flex items-center gap-3">
-                                  <PlayCircle className="w-4 h-4 text-primary shrink-0" />
-                                  <div>
-                                    <span className="text-xs sm:text-sm font-semibold text-foreground">
-                                      {lesson.title}
+                                <div className="flex items-center justify-between gap-4">
+                                  <div className="flex items-center gap-3">
+                                    <PlayCircle className="w-4 h-4 text-primary shrink-0" />
+                                    <div>
+                                      <span className="text-xs sm:text-sm font-semibold text-foreground">
+                                        {lesson.title}
+                                      </span>
+                                      {lesson.description && (
+                                        <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                                          {lesson.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-3 shrink-0">
+                                    <span className="text-xs text-muted-foreground font-mono">
+                                      {lesson.durationSeconds
+                                        ? `${Math.round(lesson.durationSeconds / 60)}m`
+                                        : '15m'}
                                     </span>
-                                    {lesson.description && (
-                                      <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
-                                        {lesson.description}
-                                      </p>
+
+                                    {lesson.isFreePreview ? (
+                                      <button
+                                        onClick={() => setPreviewLesson(lesson)}
+                                        className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 transition-all flex items-center gap-1 border border-emerald-500/30"
+                                      >
+                                        <Play className="w-3 h-3 fill-current" />
+                                        <span>Free Preview</span>
+                                      </button>
+                                    ) : isApproved ? (
+                                      <Link
+                                        href={`/courses/${course.slug || course.id}/learn?lesson=${lesson.id}`}
+                                        className="text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                                      >
+                                        Play
+                                      </Link>
+                                    ) : (
+                                      <Lock className="w-3.5 h-3.5 text-muted-foreground/60" />
                                     )}
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <span className="text-xs text-muted-foreground font-mono">
-                                    {lesson.durationSeconds
-                                      ? `${Math.round(lesson.durationSeconds / 60)}m`
-                                      : '15m'}
-                                  </span>
-
-                                  {lesson.isFreePreview ? (
-                                    <button
-                                      onClick={() => setPreviewLesson(lesson)}
-                                      className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/25 transition-all flex items-center gap-1 border border-emerald-500/30"
-                                    >
-                                      <Play className="w-3 h-3 fill-current" />
-                                      <span>Free Preview</span>
-                                    </button>
-                                  ) : isApproved ? (
-                                    <Link
-                                      href={`/courses/${course.slug || course.id}/learn?lesson=${lesson.id}`}
-                                      className="text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                                    >
-                                      Play
-                                    </Link>
-                                  ) : (
-                                    <Lock className="w-3.5 h-3.5 text-muted-foreground/60" />
-                                  )}
-                                </div>
+                                {/* Downloadable lesson resources (PDFs, worksheets, etc.) */}
+                                {lesson.resources && lesson.resources.length > 0 && (
+                                  <div className="pl-7 pt-1 flex flex-wrap gap-2">
+                                    {lesson.resources.map((r) => (
+                                      <a
+                                        key={r.id}
+                                        href={r.fileUrl || r.file_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border bg-muted/40 hover:bg-primary/10 hover:border-primary/30 transition-colors"
+                                      >
+                                        <Download className="w-3 h-3" />
+                                        <ResourceBadge fileType={r.fileType || r.file_type || 'pdf'} />
+                                        <span className="max-w-[150px] truncate">{r.title}</span>
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -643,6 +690,7 @@ export default function CourseDetail() {
             <div className="p-4 bg-black">
               <BunnyVideoPlayer
                 videoId={course.promoVideoId || course.promo_video_id || 'bunny_promo_masterclass'}
+                libraryId={course.videoLibraryId || course.video_library_id || import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '815251'}
                 title={`${course.title} - Official Promo`}
                 autoPlay={true}
               />
@@ -672,6 +720,7 @@ export default function CourseDetail() {
             <div className="p-4 bg-black">
               <BunnyVideoPlayer
                 videoId={previewLesson.bunnyVideoId || previewLesson.bunny_video_id}
+                libraryId={previewLesson.videoLibraryId || previewLesson.video_library_id || import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '815251'}
                 title={previewLesson.title}
                 autoPlay={true}
               />
