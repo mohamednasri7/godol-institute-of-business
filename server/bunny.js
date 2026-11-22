@@ -42,6 +42,83 @@ export function createBunnyRouter(dbCtx = {}) {
     });
   });
 
+  // GET live connectivity health check for Bunny Stream, Storage, and CDN
+  router.get('/health', async (req, res) => {
+    const results = {
+      stream: { status: 'unchecked', ok: false },
+      storage: { status: 'unchecked', ok: false },
+      cdn: { status: 'unchecked', ok: false }
+    };
+
+    // 1. Check Stream
+    if (BUNNY_STREAM_API_KEY && BUNNY_STREAM_LIBRARY_ID) {
+      try {
+        const streamStart = Date.now();
+        const r = await fetch(`https://video.bunnycdn.com/library/${BUNNY_STREAM_LIBRARY_ID}/videos?page=1&itemsPerPage=1`, {
+          headers: {
+            'AccessKey': BUNNY_STREAM_API_KEY,
+            'Accept': 'application/json'
+          }
+        });
+        results.stream = {
+          ok: r.ok,
+          status: r.status,
+          latencyMs: Date.now() - streamStart,
+          libraryId: BUNNY_STREAM_LIBRARY_ID,
+          error: r.ok ? null : await r.text()
+        };
+      } catch (e) {
+        results.stream = { ok: false, error: e.message };
+      }
+    } else {
+      results.stream = { ok: false, error: 'Missing BUNNY_STREAM_API_KEY or BUNNY_STREAM_LIBRARY_ID in .env' };
+    }
+
+    // 2. Check Storage
+    if (BUNNY_STORAGE_API_KEY && BUNNY_STORAGE_ZONE_NAME) {
+      try {
+        const storageStart = Date.now();
+        const r = await fetch(`https://${BUNNY_STORAGE_HOST}/${BUNNY_STORAGE_ZONE_NAME}/`, {
+          headers: {
+            'AccessKey': BUNNY_STORAGE_API_KEY,
+            'Accept': 'application/json'
+          }
+        });
+        results.storage = {
+          ok: r.ok,
+          status: r.status,
+          latencyMs: Date.now() - storageStart,
+          storageZone: BUNNY_STORAGE_ZONE_NAME,
+          storageHost: BUNNY_STORAGE_HOST,
+          error: r.ok ? null : await r.text()
+        };
+      } catch (e) {
+        results.storage = { ok: false, error: e.message };
+      }
+    } else {
+      results.storage = { ok: false, error: 'Missing BUNNY_STORAGE_API_KEY or BUNNY_STORAGE_ZONE_NAME in .env' };
+    }
+
+    // 3. Check CDN
+    try {
+      const cdnStart = Date.now();
+      const r = await fetch(BUNNY_CDN_BASE_URL);
+      results.cdn = {
+        ok: r.status < 500,
+        status: r.status,
+        latencyMs: Date.now() - cdnStart,
+        baseUrl: BUNNY_CDN_BASE_URL
+      };
+    } catch (e) {
+      results.cdn = { ok: false, error: e.message, baseUrl: BUNNY_CDN_BASE_URL };
+    }
+
+    res.json({
+      allOk: Boolean(results.stream.ok && results.storage.ok),
+      ...results
+    });
+  });
+
   // ─────────────────────────────────────────────────────────────────────────
   // POST /api/bunny/stream/sign-tus
   // Server-side TUS signature for direct browser → Bunny Stream resumable upload

@@ -550,9 +550,34 @@ NOTIFY pgrst, 'reload schema';`;
       // After a short delay, optimistically mark ready
       setTimeout(() => setVideoStatus('ready'), 4000);
 
-    } catch (err) {
-      setVideoStatus('pending');
-      showToast('TUS upload error: ' + (err?.message || String(err)), 'error');
+    } catch (tusErr) {
+      console.warn('Direct TUS upload encountered error, attempting server fallback upload...', tusErr);
+      try {
+        showToast('Direct upload blocked — uploading via secure server proxy...');
+        const fallbackRes = await bunnyService.uploadVideo(
+          file,
+          {
+            title: `${selectedCourse?.title || 'Course'} - ${activeLesson.title}`,
+            lessonId: activeLesson.id
+          },
+          (progress) => {
+            setVideoUploadProgress(progress);
+          }
+        );
+
+        const vId = fallbackRes.videoId || customBunnyVideoId;
+        setCustomBunnyVideoId(vId);
+        setVideoStatus('ready');
+        await handleUpdateLessonField({
+          bunnyVideoId: vId,
+          videoLibraryId: fallbackRes.libraryId || DEFAULT_LIBRARY_ID,
+          videoStatus: 'ready'
+        });
+        showToast('Video uploaded and linked successfully!');
+      } catch (fallbackErr) {
+        setVideoStatus('pending');
+        showToast('Video upload error: ' + (fallbackErr?.message || tusErr?.message || 'Upload failed'), 'error');
+      }
     } finally {
       setIsUploadingVideo(false);
     }
