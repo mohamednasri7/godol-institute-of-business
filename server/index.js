@@ -396,24 +396,52 @@ export const upsertToSupabase = syncRecordToSupabase;
 let lastSyncTime = 0;
 let isSyncingNow = false;
 
+// Set of tables that returned PGRST205 / schema cache error to avoid repeated failing network calls
+const KNOWN_UNAVAILABLE_TABLES = new Map();
+
 // In-memory admin authentication sessions and rate-limiting
 const adminSessions = new Map();
 const loginRateLimiter = new Map();
 
-// Pull latest data from Supabase into local DB
+// Pull latest data from Supabase into local DB (Non-blocking parallel fetch)
 export async function pullFromSupabase() {
   if (!isSupabaseConfigured || !supabase) return false;
   try {
     const db = loadDB();
     let updated = false;
+    const now = Date.now();
 
     const currentDb = loadDB();
-    for (const [localKey, supabaseTable] of Object.entries(LOCAL_TO_SUPABASE)) {
-      // Handle posts specially below
-      if (localKey === 'posts' || localKey === 'blog' || localKey === 'post_metrics' || localKey === 'post_comments') continue;
+    const tableEntries = Object.entries(LOCAL_TO_SUPABASE).filter(([localKey, supabaseTable]) => {
+      if (localKey === 'posts' || localKey === 'blog' || localKey === 'post_metrics' || localKey === 'post_comments') return false;
+      const unavailAt = KNOWN_UNAVAILABLE_TABLES.get(supabaseTable);
+      if (unavailAt && (now - unavailAt < 10 * 60 * 1000)) return false; // Skip unavailable tables for 10 minutes
+      return true;
+    });
 
-      const { data, error } = await supabase.from(supabaseTable).select('*');
-      if (!error && Array.isArray(data)) {
+    // Run active table queries concurrently with a 3.5s timeout so network stalls never freeze the server
+    const results = await Promise.allSettled(
+      tableEntries.map(async ([localKey, supabaseTable]) => {
+        try {
+          const fetchPromise = supabase.from(supabaseTable).select('*');
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3500));
+          const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+          if (error) {
+            if (error.code === 'PGRST205' || error.message?.includes('schema cache') || error.code === '42P01') {
+              KNOWN_UNAVAILABLE_TABLES.set(supabaseTable, Date.now());
+            }
+            return { localKey, supabaseTable, error };
+          }
+          return { localKey, supabaseTable, data };
+        } catch (e) {
+          return { localKey, supabaseTable, error: e };
+        }
+      })
+    );
+
+    for (const res of results) {
+      if (res.status === 'fulfilled' && !res.value.error && Array.isArray(res.value.data)) {
+        const { localKey, data } = res.value;
         if (localKey === 'instructors') {
           db.instructors = data.map(row => {
             const inst = rowToCamel(row);
@@ -434,21 +462,9 @@ export async function pullFromSupabase() {
       }
     }
 
-    // Pull blog posts (first check 'posts' table, fall back to 'blog_posts')
-    let postsLoaded = false;
-    const { data: postsData, error: postsErr } = await supabase.from('posts').select('*');
-    if (!postsErr && Array.isArray(postsData) && postsData.length > 0) {
-      db.posts = postsData.map(rowToCamel);
-      db.blog = db.posts;
-      postsLoaded = true;
-      updated = true;
-      // Also pull metrics if posts table exists
-      const { data: metricsData } = await supabase.from('post_metrics').select('*');
-      if (Array.isArray(metricsData)) db.post_metrics = metricsData.map(rowToCamel);
-    }
-
-    if (!postsLoaded) {
-      const { data: blogData, error: blogErr } = await supabase.from('blog_posts').select('*');
+    // Pull blog posts (first check 'blog_posts' since it is the active table in Supabase)
+    try {
+      const { data: blogData, error: blogErr } = await supabase.from('blog_posts').select('*').limit(100);
       if (!blogErr && Array.isArray(blogData) && blogData.length > 0) {
         const mappedBlog = blogData.map(b => ({
           id: b.id,
@@ -472,7 +488,16 @@ export async function pullFromSupabase() {
         db.posts = mappedBlog;
         db.blog = mappedBlog;
         updated = true;
+      } else {
+        const { data: postsData, error: postsErr } = await supabase.from('posts').select('*').limit(100);
+        if (!postsErr && Array.isArray(postsData) && postsData.length > 0) {
+          db.posts = postsData.map(rowToCamel);
+          db.blog = db.posts;
+          updated = true;
+        }
       }
+    } catch {
+      // blog pull error ignored
     }
 
     // Ensure every post has an entry in post_metrics
@@ -497,11 +522,13 @@ export async function pullFromSupabase() {
     });
 
     // Pull settings
-    const { data: settingsData, error: sErr } = await supabase.from('platform_settings').select('*');
-    if (!sErr && Array.isArray(settingsData) && settingsData.length > 0) {
-      db.settings = settingsData.map(rowToCamel);
-      updated = true;
-    }
+    try {
+      const { data: settingsData, error: sErr } = await supabase.from('platform_settings').select('*');
+      if (!sErr && Array.isArray(settingsData) && settingsData.length > 0) {
+        db.settings = settingsData.map(rowToCamel);
+        updated = true;
+      }
+    } catch {}
 
     if (updated) {
       db.stats = {
@@ -517,8 +544,8 @@ export async function pullFromSupabase() {
       } catch {
         // Ignored on serverless
       }
-      lastSyncTime = Date.now();
     }
+    lastSyncTime = Date.now();
     return true;
   } catch (err) {
     console.error('Error in pullFromSupabase:', err.message);
@@ -526,11 +553,11 @@ export async function pullFromSupabase() {
   }
 }
 
-// Ensure data is fresh from Supabase before reading
+// Ensure data is fresh from Supabase before reading (non-blocking when stale)
 export async function ensureFreshData(force = false) {
   if (!isSupabaseConfigured || !supabase) return loadDB();
   const now = Date.now();
-  if (force || (now - lastSyncTime > 800 && !isSyncingNow)) {
+  if (force || (now - lastSyncTime > 45000 && !isSyncingNow)) {
     isSyncingNow = true;
     try {
       await pullFromSupabase();
@@ -543,12 +570,12 @@ export async function ensureFreshData(force = false) {
   return loadDB();
 }
 
-// Background sync every 5 seconds so any changes made on Supabase
-// are pulled automatically into the dashboard and website without needing a reload
+// Background sync every 45 seconds so any changes made on Supabase
+// are pulled automatically into the dashboard and website without blocking user actions
 if (isSupabaseConfigured) {
   const syncInterval = setInterval(() => {
     ensureFreshData().catch(() => { });
-  }, 5000);
+  }, 45000);
   if (syncInterval.unref) syncInterval.unref();
 }
 
@@ -798,14 +825,14 @@ export function createApiRouter() {
   // Bunny.net Stream & Storage CDN Router
   router.use('/bunny', createBunnyRouter({ loadDB, saveDB, supabase, isSupabaseConfigured, syncRecordToSupabase }));
 
-  // Auto-sync middleware: for any GET request, if it's been > 800ms since last sync or requested with fresh/timestamp,
-  // pull latest changes from Supabase so the dashboard and website always show the newest data immediately
-  router.use(async (req, res, next) => {
+  // Auto-sync middleware: keep local memory cache fresh via non-blocking background sync
+  // NEVER block incoming GET requests — serve instantly from memoryDB in <1ms!
+  router.use((req, res, next) => {
     if (isSupabaseConfigured && req.method === 'GET') {
       const isExplicitFresh = req.query.fresh === 'true' || Boolean(req.query._t);
       const now = Date.now();
-      if (isExplicitFresh || (now - lastSyncTime > 800 && !isSyncingNow)) {
-        await ensureFreshData(Boolean(isExplicitFresh));
+      if ((isExplicitFresh || now - lastSyncTime > 45000) && !isSyncingNow) {
+        ensureFreshData(Boolean(isExplicitFresh)).catch(() => {});
       }
     }
     next();
@@ -885,8 +912,7 @@ export function createApiRouter() {
   });
 
   // Courses
-  router.get('/courses', async (req, res) => {
-    if (isSupabaseConfigured) await ensureFreshData();
+  router.get('/courses', (req, res) => {
     const db = loadDB();
     // Live on website if published or approved, and not rejected
     let result = db.courses.filter(c => {
@@ -917,8 +943,7 @@ export function createApiRouter() {
     res.json(result);
   });
 
-  router.get('/courses/featured', async (req, res) => {
-    if (isSupabaseConfigured) await ensureFreshData();
+  router.get('/courses/featured', (req, res) => {
     const db = loadDB();
     const published = db.courses
       .filter(c => (c.status === 'published' || c.is_published === true || !c.status) && c.approvalStatus !== 'rejected')
@@ -928,8 +953,7 @@ export function createApiRouter() {
     res.json(result);
   });
 
-  router.get('/courses/:id', async (req, res) => {
-    if (isSupabaseConfigured) await ensureFreshData();
+  router.get('/courses/:id', (req, res) => {
     const db = loadDB();
     const course = db.courses.find(c => c.id === Number(req.params.id) || c.slug === req.params.id);
     if (!course) return res.status(404).json({ error: 'Course not found' });
@@ -947,12 +971,41 @@ export function createApiRouter() {
 
   // ─────────── INTERACTIVE COURSE CURRICULUM & LEARNING PLAYER ───────────
 
+  // Helper to format structured modules from local memory DB (<1ms)
+  function getStructuredModulesFromMemory(db, courseIdStr) {
+    const localModules = (db.course_modules || [])
+      .filter(m => String(m.courseId || m.course_id) === courseIdStr)
+      .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1));
+
+    return localModules.map(mod => {
+      const modIdStr = String(mod.id);
+      const lessons = (db.course_lessons || [])
+        .filter(l => String(l.moduleId || l.module_id) === modIdStr)
+        .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
+        .map(l => {
+          const lIdStr = String(l.id);
+          const lessonResources = (db.lesson_resources || []).filter(r => String(r.lessonId || r.lesson_id) === lIdStr);
+          return {
+            ...l,
+            bunnyVideoId: l.bunnyVideoId || l.bunny_video_id || '',
+            videoLibraryId: l.videoLibraryId || l.video_library_id || l.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '815251',
+            videoStatus: l.videoStatus || l.video_status || (l.bunnyVideoId || l.bunny_video_id ? 'ready' : 'pending'),
+            resources: lessonResources
+          };
+        });
+      return {
+        ...mod,
+        lessons
+      };
+    });
+  }
+
   // Get full structured curriculum (modules + lessons + resources) for a course
   router.get('/courses/:id/curriculum', async (req, res) => {
     const db = loadDB();
     let course = findCourseById(db, req.params.id);
 
-    // If not in memory, check Supabase directly
+    // If not in memory, check Supabase directly with fast timeout
     if (!course && isSupabaseConfigured && supabase) {
       try {
         const idQuery = !isNaN(Number(req.params.id)) ? Number(req.params.id) : req.params.id;
@@ -974,18 +1027,33 @@ export function createApiRouter() {
     const courseIdNum = !isNaN(Number(course.id)) ? Number(course.id) : course.id;
     const courseIdStr = String(course.id);
 
-    let structuredModules = [];
+    // 1. FAST PATH: Return from memory if modules already exist (<1ms response)
+    const memoryModules = getStructuredModulesFromMemory(db, courseIdStr);
+    if (memoryModules.length > 0) {
+      return res.json({
+        course: enrichCourseWithDynamicStats(course, db),
+        modules: memoryModules
+      });
+    }
 
-    // Query Supabase directly if configured
-    if (isSupabaseConfigured && supabase) {
+    // 2. FALLBACK PATH: Query Supabase if table is available and not marked missing
+    let structuredModules = [];
+    const isModuleTableUnavail = KNOWN_UNAVAILABLE_TABLES.get('course_modules') && (Date.now() - KNOWN_UNAVAILABLE_TABLES.get('course_modules') < 10 * 60 * 1000);
+    if (isSupabaseConfigured && supabase && !isModuleTableUnavail) {
       try {
-        const { data: sbMods, error: mErr } = await supabase
+        const modPromise = supabase
           .from('course_modules')
           .select('*')
           .eq('course_id', courseIdNum)
           .order('sort_order', { ascending: true });
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500));
+        const { data: sbMods, error: mErr } = await Promise.race([modPromise, timeoutPromise]);
 
-        if (!mErr && Array.isArray(sbMods) && sbMods.length > 0) {
+        if (mErr) {
+          if (mErr.code === 'PGRST205' || mErr.message?.includes('schema cache')) {
+            KNOWN_UNAVAILABLE_TABLES.set('course_modules', Date.now());
+          }
+        } else if (Array.isArray(sbMods) && sbMods.length > 0) {
           const modIds = sbMods.map(m => m.id);
           const { data: sbLessons } = await supabase
             .from('course_lessons')
@@ -1017,7 +1085,7 @@ export function createApiRouter() {
                 return {
                   ...lCamel,
                   bunnyVideoId: lCamel.bunnyVideoId || lCamel.bunny_video_id || '',
-                  videoLibraryId: lCamel.videoLibraryId || lCamel.video_library_id || lCamel.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
+                  videoLibraryId: lCamel.videoLibraryId || lCamel.video_library_id || lCamel.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '815251',
                   videoStatus: lCamel.videoStatus || lCamel.video_status || (lCamel.bunnyVideoId ? 'ready' : 'pending'),
                   resources: lRes
                 };
@@ -1027,38 +1095,25 @@ export function createApiRouter() {
               lessons: modLessons
             };
           });
+
+          // Cache into memory for subsequent instant calls
+          db.course_modules = db.course_modules || [];
+          sbMods.forEach(m => {
+            const camel = rowToCamel(m);
+            const idx = db.course_modules.findIndex(x => String(x.id) === String(camel.id));
+            if (idx >= 0) db.course_modules[idx] = camel;
+            else db.course_modules.push(camel);
+          });
+          saveDB(db);
         }
       } catch (sbCurErr) {
         console.warn('Direct Supabase curriculum query warning:', sbCurErr.message);
       }
     }
 
-    // Fall back to memory DB if Supabase modules weren't found
+    // 3. Fall back to memory DB if Supabase modules weren't found
     if (structuredModules.length === 0) {
-      structuredModules = (db.course_modules || [])
-        .filter(m => String(m.courseId || m.course_id) === courseIdStr)
-        .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
-        .map(mod => {
-          const modIdStr = String(mod.id);
-          const lessons = (db.course_lessons || [])
-            .filter(l => String(l.moduleId || l.module_id) === modIdStr)
-            .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1))
-            .map(l => {
-              const lIdStr = String(l.id);
-              const lessonResources = (db.lesson_resources || []).filter(r => String(r.lessonId || r.lesson_id) === lIdStr);
-              return {
-                ...l,
-                bunnyVideoId: l.bunnyVideoId || l.bunny_video_id || '',
-                videoLibraryId: l.videoLibraryId || l.video_library_id || l.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '342890',
-                videoStatus: l.videoStatus || l.video_status || (l.bunnyVideoId || l.bunny_video_id ? 'ready' : 'pending'),
-                resources: lessonResources
-              };
-            });
-          return {
-            ...mod,
-            lessons
-          };
-        });
+      structuredModules = getStructuredModulesFromMemory(db, courseIdStr);
     }
 
     res.json({
@@ -1090,8 +1145,7 @@ export function createApiRouter() {
   });
 
   // Course Stats (Enrolled counts & average completion rates)
-  router.get('/courses/:id/stats', async (req, res) => {
-    if (isSupabaseConfigured) await ensureFreshData();
+  router.get('/courses/:id/stats', (req, res) => {
     const db = loadDB();
     const course = findCourseById(db, req.params.id);
     if (!course) return res.status(404).json({ error: 'Course not found' });
@@ -2018,7 +2072,6 @@ export function createApiRouter() {
   // ─────────── CHECKOUT / ENROLLMENT INITIATION ───────────
   // Step 1: Student initiates enrollment → creates pending_payment enrollment
   router.post('/checkout', async (req, res) => {
-    await ensureFreshData();
     const db = loadDB();
     const { courseId, studentEmail, studentName, studentPhone } = req.body;
 
@@ -2087,7 +2140,6 @@ export function createApiRouter() {
   // ─────────── PAYMENT SUBMISSION ───────────
   // Step 2: Student submits payment transaction details and receipt
   router.post('/payments/submit', async (req, res) => {
-    await ensureFreshData();
     const db = loadDB();
     const {
       enrollmentId,
@@ -2255,7 +2307,6 @@ export function createApiRouter() {
 
   // Get single enrollment with payment details
   router.get('/enrollments/:id', async (req, res) => {
-    await ensureFreshData();
     const db = loadDB();
     const id = Number(req.params.id);
     let enrollment = !isNaN(id) && id > 0 ? db.enrollments.find(e => e.id === id) : null;
@@ -2306,8 +2357,7 @@ export function createApiRouter() {
     res.json({ enrollment, payment: payment || null });
   });
 
-  router.get('/enrollments', async (req, res) => {
-    await ensureFreshData();
+  router.get('/enrollments', (req, res) => {
     const db = loadDB();
     const { email } = req.query;
     if (email) {
@@ -2648,8 +2698,7 @@ export function createApiRouter() {
 
   // ─────────── ADMIN COURSES ───────────
 
-  router.get('/admin/courses', async (req, res) => {
-    if (isSupabaseConfigured) await ensureFreshData();
+  router.get('/admin/courses', (req, res) => {
     const db = loadDB();
     res.json((db.courses || []).map(c => enrichCourseWithDynamicStats(c, db)));
   });
@@ -2686,7 +2735,6 @@ export function createApiRouter() {
   });
 
   router.post('/admin/courses', async (req, res) => {
-    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
     const status = req.body.status || 'published';
     const isPub = status === 'published';
@@ -2744,7 +2792,6 @@ export function createApiRouter() {
   });
 
   router.put('/admin/courses/:id', async (req, res) => {
-    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
     const id = Number(req.params.id);
     const idx = db.courses.findIndex(c => c.id === id);
@@ -3333,7 +3380,6 @@ export function createApiRouter() {
 
   // Admin directly creates a course assigned to this instructor
   router.post('/admin/instructors/:id/create-course', async (req, res) => {
-    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
     const id = Number(req.params.id);
     const inst = db.instructors.find(i => i.id === id);
@@ -3373,7 +3419,6 @@ export function createApiRouter() {
 
   // Admin writes a blog article under this instructor's name
   router.post('/admin/instructors/:id/create-blog', async (req, res) => {
-    if (isSupabaseConfigured) await ensureFreshData();
     const db = loadDB();
     const id = Number(req.params.id);
     const inst = db.instructors.find(i => i.id === id);

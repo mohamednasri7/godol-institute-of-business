@@ -138,36 +138,45 @@ export default function AdminCourseContent() {
     fetchCourses();
   }, []);
 
-  // Fetch curriculum & stats when selectedCourseId changes
+  // Fetch curriculum & stats in parallel when selectedCourseId changes
   const fetchCurriculum = async () => {
     if (!selectedCourseId) return;
     try {
-      const data = await apiFetch(`/api/courses/${selectedCourseId}/curriculum`);
-      setCurriculum(data);
-      // Keep activeLesson updated if it's currently open in modal
-      if (activeLesson) {
-        let refreshedLesson = null;
-        for (const mod of data.modules || []) {
-          const found = (mod.lessons || []).find((l) => l.id === activeLesson.id);
-          if (found) {
-            refreshedLesson = found;
-            break;
+      const [currRes, statsRes] = await Promise.allSettled([
+        apiFetch(`/api/courses/${selectedCourseId}/curriculum`),
+        apiFetch(`/api/courses/${selectedCourseId}/stats`)
+      ]);
+
+      if (currRes.status === 'fulfilled' && currRes.value) {
+        const data = currRes.value;
+        setCurriculum(data);
+        // Keep activeLesson updated if it's currently open in modal
+        if (activeLesson) {
+          let refreshedLesson = null;
+          for (const mod of data.modules || []) {
+            const found = (mod.lessons || []).find((l) => l.id === activeLesson.id);
+            if (found) {
+              refreshedLesson = found;
+              break;
+            }
+          }
+          if (refreshedLesson) {
+            setActiveLesson(refreshedLesson);
+            setCustomBunnyVideoId(refreshedLesson.bunnyVideoId || refreshedLesson.bunny_video_id || '');
+            setVideoStatus(refreshedLesson.videoStatus || (refreshedLesson.bunnyVideoId ? 'ready' : 'pending'));
           }
         }
-        if (refreshedLesson) {
-          setActiveLesson(refreshedLesson);
-          setCustomBunnyVideoId(refreshedLesson.bunnyVideoId || refreshedLesson.bunny_video_id || '');
-          setVideoStatus(refreshedLesson.videoStatus || (refreshedLesson.bunnyVideoId ? 'ready' : 'pending'));
-        }
+      } else {
+        setCurriculum({ course: null, modules: [] });
+      }
+
+      if (statsRes.status === 'fulfilled' && statsRes.value) {
+        setCourseStats(statsRes.value);
+      } else {
+        setCourseStats({ totalEnrolled: 0, completedCount: 0, avgProgress: 0 });
       }
     } catch {
       setCurriculum({ course: null, modules: [] });
-    }
-
-    try {
-      const stats = await apiFetch(`/api/courses/${selectedCourseId}/stats`);
-      setCourseStats(stats);
-    } catch {
       setCourseStats({ totalEnrolled: 0, completedCount: 0, avgProgress: 0 });
     }
   };
