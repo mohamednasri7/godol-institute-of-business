@@ -96,6 +96,7 @@ export default function AdminCourseContent() {
   const [videoUploadProgress, setVideoUploadProgress] = useState(null); // { percent, loaded, total }
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [customBunnyVideoId, setCustomBunnyVideoId] = useState('');
+  const [customBunnyLibraryId, setCustomBunnyLibraryId] = useState(DEFAULT_LIBRARY_ID);
   const [videoStatus, setVideoStatus] = useState('ready'); // 'pending' | 'uploading' | 'processing' | 'ready'
   const videoInputRef = useRef(null);
 
@@ -245,6 +246,7 @@ NOTIFY pgrst, 'reload schema';`;
           if (refreshedLesson) {
             setActiveLesson(refreshedLesson);
             setCustomBunnyVideoId(refreshedLesson.bunnyVideoId || refreshedLesson.bunny_video_id || '');
+            setCustomBunnyLibraryId(refreshedLesson.videoLibraryId || refreshedLesson.video_library_id || DEFAULT_LIBRARY_ID);
             setVideoStatus(refreshedLesson.videoStatus || (refreshedLesson.bunnyVideoId ? 'ready' : 'pending'));
           }
         }
@@ -439,7 +441,8 @@ NOTIFY pgrst, 'reload schema';`;
     setActiveLessonModule(mod);
     setDrawerTab('video');
     setCustomBunnyVideoId(lesson.bunnyVideoId || lesson.bunny_video_id || '');
-    setVideoStatus(lesson.videoStatus || (lesson.bunnyVideoId ? 'ready' : 'pending'));
+    setCustomBunnyLibraryId(lesson.videoLibraryId || lesson.video_library_id || DEFAULT_LIBRARY_ID);
+    setVideoStatus(lesson.videoStatus || (lesson.bunnyVideoId || lesson.bunny_video_id ? 'ready' : 'pending'));
     setVideoUploadProgress(null);
     setResourceUploadProgress(null);
   };
@@ -585,15 +588,20 @@ NOTIFY pgrst, 'reload schema';`;
 
   const handleManualVideoIdSave = async () => {
     if (!activeLesson) return;
-    const cleanId = customBunnyVideoId.trim();
+    const cleanVideoId = customBunnyVideoId.trim();
+    const cleanLibraryId = (customBunnyLibraryId || '').trim() || DEFAULT_LIBRARY_ID;
+
     try {
       await handleUpdateLessonField({
-        bunnyVideoId: cleanId,
-        videoLibraryId: DEFAULT_LIBRARY_ID,
-        videoStatus: cleanId ? 'ready' : 'pending'
+        bunnyVideoId: cleanVideoId,
+        bunny_video_id: cleanVideoId,
+        videoLibraryId: cleanLibraryId,
+        video_library_id: cleanLibraryId,
+        videoStatus: cleanVideoId ? 'ready' : 'pending',
+        video_status: cleanVideoId ? 'ready' : 'pending'
       });
-      setVideoStatus(cleanId ? 'ready' : 'pending');
-      showToast(cleanId ? 'Bunny Video ID linked successfully' : 'Video ID removed');
+      setVideoStatus(cleanVideoId ? 'ready' : 'pending');
+      showToast(cleanVideoId ? 'Bunny Video ID linked successfully (Status: ready)' : 'Video ID removed');
     } catch (err) {
       showToast('Failed to link Video ID: ' + err.message, 'error');
     }
@@ -604,7 +612,9 @@ NOTIFY pgrst, 'reload schema';`;
     try {
       await handleUpdateLessonField({
         bunnyVideoId: '',
-        videoStatus: 'pending'
+        bunny_video_id: '',
+        videoStatus: 'pending',
+        video_status: 'pending'
       });
       setCustomBunnyVideoId('');
       setVideoStatus('pending');
@@ -683,7 +693,7 @@ NOTIFY pgrst, 'reload schema';`;
   };
 
   const activeVideoId = activeLesson?.bunnyVideoId || activeLesson?.bunny_video_id || customBunnyVideoId;
-  const activeLibraryId = activeLesson?.videoLibraryId || activeLesson?.video_library_id || DEFAULT_LIBRARY_ID;
+  const activeLibraryId = (customBunnyLibraryId || '').trim() || activeLesson?.videoLibraryId || activeLesson?.video_library_id || DEFAULT_LIBRARY_ID;
   const activeResources = activeLesson?.resources || [];
 
   return (
@@ -1335,42 +1345,73 @@ NOTIFY pgrst, 'reload schema';`;
                   )}
 
                   {/* Direct Bunny Video ID Field (Paste Existing ID) */}
-                  <div className="p-4 rounded-2xl bg-card border border-border space-y-3">
-                    <label className="block text-xs font-bold text-foreground">
-                      Link Existing Bunny Video ID (or paste GUID)
-                    </label>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        type="text"
-                        placeholder="e.g. b27e98a1-45f8-4399-bfb7-0243ac120002"
-                        value={customBunnyVideoId}
-                        onChange={(e) => setCustomBunnyVideoId(e.target.value)}
-                        className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono outline-none focus:border-primary"
-                      />
-                      <div className="flex items-center gap-2">
+                  <div className="p-5 rounded-2xl bg-card border border-border space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-foreground">
+                        Link Existing Bunny Stream Video
+                      </label>
+                      {activeVideoId && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-bold border border-emerald-500/30 flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          <span>Video Linked & Ready</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="md:col-span-2 space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          Bunny Video ID (GUID) *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. fd675d92-63bc-458d-a831-9bdfdb26c2db"
+                          value={customBunnyVideoId}
+                          onChange={(e) => setCustomBunnyVideoId(e.target.value)}
+                          className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono outline-none focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          Library ID
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={DEFAULT_LIBRARY_ID}
+                          value={customBunnyLibraryId}
+                          onChange={(e) => setCustomBunnyLibraryId(e.target.value)}
+                          className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-xs font-mono outline-none focus:border-primary"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+                      <p className="text-[11px] text-muted-foreground">
+                        Paste any video GUID from Bunny Stream library <strong>{DEFAULT_LIBRARY_ID}</strong> to attach it directly.
+                      </p>
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={handleManualVideoIdSave}
                           disabled={isSavingLesson}
-                          className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90"
+                          className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 flex items-center gap-1.5 shadow-sm transition-all"
                         >
-                          Save Video ID
+                          <Check className="w-3.5 h-3.5" />
+                          <span>{isSavingLesson ? 'Saving...' : 'Save & Link Video'}</span>
                         </button>
                         {activeVideoId && (
                           <button
                             type="button"
                             onClick={handleDetachVideo}
-                            className="px-3 py-2.5 rounded-xl border border-border text-xs text-rose-600 hover:bg-rose-50"
-                            title="Unlink Video"
+                            className="px-3 py-2 rounded-xl border border-rose-500/30 text-xs text-rose-600 hover:bg-rose-500/10 font-semibold transition-colors"
+                            title="Unlink Video from Lesson"
                           >
                             Unlink
                           </button>
                         )}
                       </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      If you already uploaded the video directly in your Bunny.net Stream Dashboard, paste its GUID here.
-                    </p>
                   </div>
 
                   {/* Live Embedded Preview (Bunny Stream iframe player) */}

@@ -28,6 +28,8 @@ import { apiFetch } from '../lib/api';
 import { auth } from '../lib/auth';
 import BunnyVideoPlayer from '../components/course/BunnyVideoPlayer';
 
+const DEFAULT_LIBRARY_ID = import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '815251';
+
 function formatSeconds(sec) {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
@@ -394,7 +396,7 @@ export default function CoursePlayer() {
               <BunnyVideoPlayer
                 ref={playerRef}
                 videoId={activeLesson?.bunnyVideoId || activeLesson?.bunny_video_id}
-                libraryId={activeLesson?.videoLibraryId || activeLesson?.video_library_id || activeLesson?.bunnyLibraryId || activeLesson?.bunny_library_id}
+                libraryId={activeLesson?.videoLibraryId || activeLesson?.video_library_id || activeLesson?.bunnyLibraryId || activeLesson?.bunny_library_id || DEFAULT_LIBRARY_ID}
                 title={activeLesson?.title}
                 autoPlay={false}
                 hasNextLesson={Boolean(nextLesson)}

@@ -1074,8 +1074,11 @@ export function createApiRouter() {
           return {
             ...l,
             bunnyVideoId: l.bunnyVideoId || l.bunny_video_id || '',
+            bunny_video_id: l.bunnyVideoId || l.bunny_video_id || '',
             videoLibraryId: l.videoLibraryId || l.video_library_id || l.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '815251',
+            video_library_id: l.videoLibraryId || l.video_library_id || l.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '815251',
             videoStatus: l.videoStatus || l.video_status || (l.bunnyVideoId || l.bunny_video_id ? 'ready' : 'pending'),
+            video_status: l.videoStatus || l.video_status || (l.bunnyVideoId || l.bunny_video_id ? 'ready' : 'pending'),
             resources: lessonResources
           };
         });
@@ -1507,15 +1510,30 @@ export function createApiRouter() {
     const lIndex = db.course_lessons.findIndex(l => l.id === lessonId);
     if (lIndex === -1) return res.status(404).json({ error: 'Lesson not found' });
 
+    const body = req.body || {};
+    const updates = { ...body };
+
+    // Standardize video fields across both snake_case and camelCase
+    if (body.bunny_video_id !== undefined) updates.bunnyVideoId = body.bunny_video_id;
+    if (body.bunnyVideoId !== undefined) updates.bunny_video_id = body.bunnyVideoId;
+    if (body.video_library_id !== undefined) updates.videoLibraryId = body.video_library_id;
+    if (body.videoLibraryId !== undefined) updates.video_library_id = body.videoLibraryId;
+    if (body.video_status !== undefined) updates.videoStatus = body.video_status;
+    if (body.videoStatus !== undefined) updates.video_status = body.videoStatus;
+
     const updated = {
       ...db.course_lessons[lIndex],
-      ...req.body
+      ...updates
     };
     db.course_lessons[lIndex] = updated;
     saveDB(db);
 
     if (isSupabaseConfigured && supabase) {
-      await syncRecordToSupabase('course_lessons', updated);
+      try {
+        await syncRecordToSupabase('course_lessons', updated);
+      } catch (sbErr) {
+        console.warn('Supabase course_lessons sync warning:', sbErr.message);
+      }
     }
     recalculateAndSyncCourse(updated.courseId || updated.course_id, db);
 
