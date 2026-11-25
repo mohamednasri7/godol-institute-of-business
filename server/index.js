@@ -190,10 +190,12 @@ function loadDB() {
       }
     });
 
+    hydrateModulesFromSections(data);
     memoryDB = data;
     return data;
   } catch (err) {
     memoryDB = JSON.parse(JSON.stringify(initialData));
+    hydrateModulesFromSections(memoryDB);
     return memoryDB;
   }
 }
@@ -455,6 +457,21 @@ export async function pullFromSupabase() {
             }
             return inst;
           });
+        } else if (localKey === 'courses') {
+          const fetchedCourses = data.map(rowToCamel);
+          const merged = [...(currentDb.courses || [])];
+          for (const fc of fetchedCourses) {
+            const idx = merged.findIndex(c => String(c.id) === String(fc.id));
+            if (idx >= 0) {
+              const localCourse = merged[idx];
+              const remoteSections = Array.isArray(fc.sections) && fc.sections.length > 0 ? fc.sections : (localCourse.sections || []);
+              merged[idx] = { ...localCourse, ...fc, sections: remoteSections };
+            } else {
+              merged.push(fc);
+            }
+          }
+          db.courses = merged;
+          hydrateModulesFromSections(db);
         } else {
           db[localKey] = data.map(rowToCamel);
         }
@@ -728,6 +745,85 @@ function addNotification(db, type, studentEmail, message) {
 function getSettingValue(db, key) {
   const s = db.settings.find(s => s.key === key);
   return s ? s.value : '';
+}
+
+// Hydrate course_modules, course_lessons, and lesson_resources from course.sections
+// Ensures full backwards/forwards compatibility whether curriculum is stored in dedicated tables or courses.sections JSON
+export function hydrateModulesFromSections(db) {
+  if (!db || !Array.isArray(db.courses)) return;
+  db.course_modules = db.course_modules || [];
+  db.course_lessons = db.course_lessons || [];
+  db.lesson_resources = db.lesson_resources || [];
+
+  for (const course of db.courses) {
+    if (!Array.isArray(course.sections) || course.sections.length === 0) continue;
+    const courseIdNum = Number(course.id) || course.id;
+    const courseIdStr = String(course.id);
+
+    const existingMods = db.course_modules.filter(m => String(m.courseId || m.course_id) === courseIdStr);
+    if (existingMods.length === 0) {
+      course.sections.forEach((sec, sIdx) => {
+        const modId = sec.id || (db.course_modules.length + 100);
+        const newMod = {
+          id: modId,
+          courseId: courseIdNum,
+          course_id: courseIdNum,
+          title: sec.title || `Module ${sIdx + 1}`,
+          sortOrder: sec.sortOrder || sec.sort_order || (sIdx + 1),
+          sort_order: sec.sortOrder || sec.sort_order || (sIdx + 1),
+          createdAt: sec.createdAt || new Date().toISOString()
+        };
+        db.course_modules.push(newMod);
+
+        if (Array.isArray(sec.lessons)) {
+          sec.lessons.forEach((les, lIdx) => {
+            const lesId = les.id || (db.course_lessons.length + 200);
+            const newLes = {
+              id: lesId,
+              moduleId: modId,
+              module_id: modId,
+              courseId: courseIdNum,
+              course_id: courseIdNum,
+              title: les.title || `Lesson ${lIdx + 1}`,
+              description: les.description || '',
+              bunnyVideoId: les.bunnyVideoId || les.bunny_video_id || '',
+              bunny_video_id: les.bunnyVideoId || les.bunny_video_id || '',
+              videoLibraryId: les.videoLibraryId || les.video_library_id || les.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '815251',
+              video_library_id: les.videoLibraryId || les.video_library_id || les.bunnyLibraryId || process.env.BUNNY_STREAM_LIBRARY_ID || '815251',
+              videoStatus: les.videoStatus || les.video_status || (les.bunnyVideoId || les.bunny_video_id ? 'ready' : 'pending'),
+              video_status: les.videoStatus || les.video_status || (les.bunnyVideoId || les.bunny_video_id ? 'ready' : 'pending'),
+              durationSeconds: Number(les.durationSeconds || les.duration_seconds || 900),
+              isFreePreview: Boolean(les.isFreePreview || les.is_free_preview),
+              sortOrder: les.sortOrder || les.sort_order || (lIdx + 1),
+              createdAt: les.createdAt || new Date().toISOString()
+            };
+            db.course_lessons.push(newLes);
+
+            if (Array.isArray(les.resources)) {
+              les.resources.forEach((res) => {
+                const resId = res.id || (db.lesson_resources.length + 300);
+                db.lesson_resources.push({
+                  id: resId,
+                  lessonId: lesId,
+                  lesson_id: lesId,
+                  courseId: courseIdNum,
+                  course_id: courseIdNum,
+                  title: res.title || 'Resource',
+                  fileType: res.fileType || res.file_type || 'pdf',
+                  file_type: res.fileType || res.file_type || 'pdf',
+                  fileSizeBytes: res.fileSizeBytes || res.file_size_bytes || 1024,
+                  file_size_bytes: res.fileSizeBytes || res.file_size_bytes || 1024,
+                  fileUrl: res.fileUrl || res.file_url || res.url || '',
+                  file_url: res.fileUrl || res.file_url || res.url || '',
+                  createdAt: res.createdAt || new Date().toISOString()
+                });
+              });
+            }
+          });
+        }
+      });
+    }
+  }
 }
 
 // Dynamic Course Stats Calculation (Modules, Lessons, Duration, and Enrollments)
@@ -1059,9 +1155,17 @@ export function createApiRouter() {
 
   // Helper to format structured modules from local memory DB (<1ms)
   function getStructuredModulesFromMemory(db, courseIdStr) {
-    const localModules = (db.course_modules || [])
+    let localModules = (db.course_modules || [])
       .filter(m => String(m.courseId || m.course_id) === courseIdStr)
       .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1));
+
+    // If no course_modules found, check if course has sections and hydrate
+    if (localModules.length === 0) {
+      hydrateModulesFromSections(db);
+      localModules = (db.course_modules || [])
+        .filter(m => String(m.courseId || m.course_id) === courseIdStr)
+        .sort((a, b) => (a.sortOrder || a.sort_order || 1) - (b.sortOrder || b.sort_order || 1));
+    }
 
     return localModules.map(mod => {
       const modIdStr = String(mod.id);
@@ -1103,26 +1207,29 @@ export function createApiRouter() {
         const numericId = slugWithSuffix ? Number(slugWithSuffix[2]) : (!isNaN(Number(rawId)) ? Number(rawId) : null);
         const slugPart = slugWithSuffix ? slugWithSuffix[1] : rawId;
 
-        // Try numeric id first
-        if (numericId && numericId > 0) {
-          const { data: byId } = await supabase.from('courses').select('*').eq('id', numericId).maybeSingle();
-          if (byId) course = rowToCamel(byId);
-        }
-        // Try full slug
-        if (!course) {
+        const lookupPromise = (async () => {
+          if (numericId && numericId > 0) {
+            const { data: byId } = await supabase.from('courses').select('*').eq('id', numericId).maybeSingle();
+            if (byId) return rowToCamel(byId);
+          }
           const { data: bySlug } = await supabase.from('courses').select('*').eq('slug', rawId).maybeSingle();
-          if (bySlug) course = rowToCamel(bySlug);
-        }
-        // Try slug prefix (strip trailing -N)
-        if (!course && slugPart !== rawId) {
-          const { data: bySlugPrefix } = await supabase.from('courses').select('*').eq('slug', slugPart).maybeSingle();
-          if (bySlugPrefix) course = rowToCamel(bySlugPrefix);
-        }
-        if (course) {
+          if (bySlug) return rowToCamel(bySlug);
+          if (slugPart !== rawId) {
+            const { data: byPrefix } = await supabase.from('courses').select('*').eq('slug', slugPart).maybeSingle();
+            if (byPrefix) return rowToCamel(byPrefix);
+          }
+          return null;
+        })();
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2500));
+        const found = await Promise.race([lookupPromise, timeoutPromise]).catch(() => null);
+
+        if (found) {
+          course = found;
           db.courses = db.courses || [];
           if (!db.courses.some(c => String(c.id) === String(course.id))) {
             db.courses.push(course);
           }
+          hydrateModulesFromSections(db);
         }
       } catch (e) {
         console.warn('Supabase course lookup warning:', e.message);

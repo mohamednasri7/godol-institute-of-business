@@ -30,6 +30,7 @@ import {
 import AdminLayout from './AdminLayout';
 import { apiFetch } from '../../lib/api';
 import { bunnyService } from '../../lib/bunnyService';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import * as tus from 'tus-js-client';
 
 const DEFAULT_LIBRARY_ID = import.meta.env.VITE_BUNNY_STREAM_LIBRARY_ID || '815251';
@@ -69,7 +70,30 @@ function getFileTypeBadge(ext = 'pdf') {
 
 export default function AdminCourseContent() {
   const [courses, setCourses] = useState([]);
-  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [selectedCourseId, setSelectedCourseId] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const urlId = new URLSearchParams(window.location.search).get('courseId');
+      if (urlId) return String(urlId);
+      const savedId = sessionStorage.getItem('godol_active_course_id');
+      if (savedId) return String(savedId);
+    }
+    return null;
+  });
+
+  const selectCourse = (newId) => {
+    if (!newId) return;
+    const strId = String(newId);
+    setSelectedCourseId(strId);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('godol_active_course_id', strId);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('courseId') !== strId) {
+        url.searchParams.set('courseId', strId);
+        window.history.replaceState(null, '', url.toString());
+      }
+    }
+  };
+
   const [curriculum, setCurriculum] = useState({ course: null, modules: [] });
   const [courseStats, setCourseStats] = useState({ totalEnrolled: 0, completedCount: 0, avgProgress: 0 });
   const [isLoading, setIsLoading] = useState(true);
@@ -195,7 +219,7 @@ NOTIFY pgrst, 'reload schema';`;
     }
   };
 
-  // Fetch all courses and honor ?courseId= from URL
+  // Fetch all courses and maintain persistent active course selection
   const fetchCourses = async () => {
     setIsLoading(true);
     try {
@@ -204,11 +228,21 @@ NOTIFY pgrst, 'reload schema';`;
 
       const urlParams = new URLSearchParams(window.location.search);
       const paramId = urlParams.get('courseId');
+      const savedId = typeof window !== 'undefined' ? sessionStorage.getItem('godol_active_course_id') : null;
 
-      if (paramId && data.some((c) => String(c.id) === String(paramId))) {
-        setSelectedCourseId(String(paramId));
-      } else if (data.length > 0 && !selectedCourseId) {
-        setSelectedCourseId(String(data[0].id));
+      // Selection priority:
+      // 1. Current selectedCourseId if still valid in fetched data (DO NOT reset!)
+      // 2. URL parameter ?courseId=
+      // 3. sessionStorage saved course
+      // 4. First course in array
+      if (selectedCourseId && data.some((c) => String(c.id) === String(selectedCourseId))) {
+        // Active course is valid — keep it!
+      } else if (paramId && data.some((c) => String(c.id) === String(paramId))) {
+        selectCourse(paramId);
+      } else if (savedId && data.some((c) => String(c.id) === String(savedId))) {
+        selectCourse(savedId);
+      } else if (data.length > 0) {
+        selectCourse(data[0].id);
       }
     } catch (err) {
       console.error('Fetch courses error:', err);
@@ -221,6 +255,11 @@ NOTIFY pgrst, 'reload schema';`;
     fetchCourses();
   }, []);
 
+  // Realtime inter-tab sync: keeps course list fresh
+  useRealtimeSync(['courses'], () => {
+    fetchCourses();
+  });
+
   // Fetch curriculum & stats in parallel when selectedCourseId changes
   const fetchCurriculum = async () => {
     if (!selectedCourseId) return;
@@ -230,7 +269,7 @@ NOTIFY pgrst, 'reload schema';`;
         apiFetch(`/api/courses/${selectedCourseId}/stats`)
       ]);
 
-      if (currRes.status === 'fulfilled' && currRes.value) {
+      if (currRes.status === 'fulfilled' && currRes.value && currRes.value.course) {
         const data = currRes.value;
         setCurriculum(data);
         // Keep activeLesson updated if it's currently open in modal
@@ -251,7 +290,15 @@ NOTIFY pgrst, 'reload schema';`;
           }
         }
       } else {
-        setCurriculum({ course: null, modules: [] });
+        // If curriculum endpoint returned empty or error, DO NOT wipe course to null!
+        // Keep existing course info from courses array so header/controls never vanish
+        const fallbackCourse = courses.find((c) => String(c.id) === String(selectedCourseId));
+        if (fallbackCourse) {
+          setCurriculum((prev) => ({
+            course: fallbackCourse,
+            modules: prev.modules || []
+          }));
+        }
       }
 
       if (statsRes.status === 'fulfilled' && statsRes.value) {
@@ -260,7 +307,13 @@ NOTIFY pgrst, 'reload schema';`;
         setCourseStats({ totalEnrolled: 0, completedCount: 0, avgProgress: 0 });
       }
     } catch {
-      setCurriculum({ course: null, modules: [] });
+      const fallbackCourse = courses.find((c) => String(c.id) === String(selectedCourseId));
+      if (fallbackCourse) {
+        setCurriculum((prev) => ({
+          course: fallbackCourse,
+          modules: prev.modules || []
+        }));
+      }
       setCourseStats({ totalEnrolled: 0, completedCount: 0, avgProgress: 0 });
     }
   };
@@ -776,7 +829,7 @@ NOTIFY pgrst, 'reload schema';`;
             <div className="flex items-center gap-3">
               <select
                 value={selectedCourseId || ''}
-                onChange={(e) => setSelectedCourseId(String(e.target.value))}
+                onChange={(e) => selectCourse(String(e.target.value))}
                 className="bg-card border border-border rounded-xl px-4 py-2.5 text-xs font-bold text-foreground outline-none focus:border-primary w-full max-w-md shadow-sm"
               >
                 {courses.map((c) => (
@@ -784,6 +837,11 @@ NOTIFY pgrst, 'reload schema';`;
                     {c.title} ({c.status === 'published' ? 'Live' : 'Draft'})
                   </option>
                 ))}
+                {selectedCourseId && !courses.some((c) => String(c.id) === String(selectedCourseId)) && selectedCourse && (
+                  <option value={selectedCourseId}>
+                    {selectedCourse.title || `Course ${selectedCourseId}`}
+                  </option>
+                )}
               </select>
               <button
                 onClick={fetchCurriculum}
